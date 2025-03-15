@@ -35,7 +35,10 @@ export const handler = async (argv: Arguments<Options>): Promise<void> => {
     const report = generateFlowReportHtml(flowResult);
     writeFileSync(`${name}.html`, report);
   } else if (argv.urls && argv.urls.length > 0) {
-    const browser = await puppeteer.launch({ headless: true });
+    const browser = await puppeteer.launch({
+      headless: true,
+      timeout: 60000
+    });
     const page = await browser.newPage();
 
     const flow = await startFlow(page, { name });
@@ -43,7 +46,7 @@ export const handler = async (argv: Arguments<Options>): Promise<void> => {
     for (const url of argv.urls) {
       await flow.navigate(url)
     }
-
+    
     await browser.close();
 
     const report = flow.generateReport();
