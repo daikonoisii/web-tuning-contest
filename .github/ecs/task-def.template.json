@@ -3,7 +3,7 @@
     "networkMode": "awsvpc",
     "containerDefinitions": [
       {
-        "name": "${CONTAINER_NAME}-${STUDENT_ID}",
+        "name": "${{ secrets.CONTAINER_NAME }}-${STUDENT_ID}",
         "image": "REPLACED_BY_GITHUB_ACTION",
         "memory": 512,
         "cpu": 256,
@@ -20,5 +20,5 @@
     "requiresCompatibilities": ["FARGATE"],
     "cpu": "256",
     "memory": "512",
-    "executionRoleArn": "arn:aws:iam::${AWS_ACCOUNT_ID}:role/ecsTaskExecutionRole"
+    "executionRoleArn": "arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/ecsTaskExecutionRole"
 }
