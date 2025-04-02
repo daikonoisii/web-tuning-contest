@@ -1,12 +1,12 @@
 name: Deploy to ECS Fargate
 
-# main/0にpull_requestがcloseされたときに実行
+# ${{ secrets.STUDENT_ID }}/mainにpull_requestがcloseされたときに実行
 # マージの是非は後ほどフィルタリング
 on:
   pull_request:
     types: [closed]
     branches:
-      - main/${{ secrets.STUDENT_ID }}
+      - ${{ secrets.STUDENT_ID }}/main
 
 # 環境変数
 env:
