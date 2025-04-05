@@ -1,5 +1,6 @@
 import type { Arguments, CommandBuilder } from "yargs";
-import puppeteer from "puppeteer";
+import chromium from "chrome-aws-lambda";
+import puppeteer from "puppeteer-core";
 import { writeFileSync } from "fs";
 // @ts-ignore
 import { startFlow } from "lighthouse/lighthouse-core/fraggle-rock/api.js";
@@ -15,6 +16,16 @@ export const builder: CommandBuilder<Options, Options> = (yargs) =>
   });
 
 export const handler = async (argv: Arguments<Options>): Promise<void> => {
+
+  if (argv.urls && argv.urls.length > 0) {
+    const browser = await puppeteer.launch({
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath,
+      headless: chromium.headless,
+      timeout: 120000,
+    });
+
   const name = new Date().toString();
   if (argv.urls && argv.urls.length > 0) {
     const browser = await puppeteer.launch({
