@@ -2,6 +2,9 @@ include .env
 
 .PHONY: init_mac generate-deploy
 
+init_develop_lambda:
+	cd ./lighthouse-flows-generator && npm install && npm run build
+
 init_mac:
 	bash -c "brew install gettext && brew link --force gettext && which envsubst && envsubst --version"
 	git checkout main
