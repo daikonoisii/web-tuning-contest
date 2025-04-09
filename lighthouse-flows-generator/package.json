@@ -22,8 +22,12 @@
   "dependencies": {
     "@types/yargs": "^17.0.7",
     "aws-lambda": "^1.0.7",
+    "aws-sdk": "^2.1692.0",
+    "chrome-aws-lambda": "^10.1.0",
     "lighthouse": "9.1.0",
     "puppeteer": "13.0.0",
+    "puppeteer-core": "^10.4.0",
+    "serverless": "^4.12.0",
     "yargs": "^17.3.0"
   }
 }
