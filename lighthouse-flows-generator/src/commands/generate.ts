@@ -1,10 +1,14 @@
 import chromium from "chrome-aws-lambda";
 import puppeteer from "puppeteer-core";
 import { S3 } from "aws-sdk";
+import type { APIGatewayProxyEvent, Context,} from "aws-lambda";
 // @ts-ignore
 import { startFlow } from "lighthouse/lighthouse-core/fraggle-rock/api.js";
 
-export const handler = async (event: any, context: any) => {
+export const handler = async (
+  event: APIGatewayProxyEvent,
+  context: Context
+  ) => {
   console.log("Event:", event);
 
   const body = JSON.parse(event.body || "{}");
