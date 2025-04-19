@@ -1,0 +1,44 @@
+service: lighthouse-flows-generator
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: ${env:AWS_REGION}
+  environment:
+    S3_BUCKET_NAME: ${env:S3_BUCKET_NAME}
+
+functions:
+  runLighthouse:
+    name: ${env:LIGHTHOUSE_FUNCTION_NAME}
+    handler: src/commands/generate.handler
+    memorySize: 1024
+    timeout: 120
+
+plugins:
+  - serverless-dotenv-plugin
+  - serverless-esbuild
+
+package:
+  individually: true
+  exclude:
+    - README.md
+    - 計画書
+    - .gitignore
+    - .npmignore
+    - bin
+
+
+custom:
+  esbuild:
+    bundle: true
+    minify: true
+    sourcemap: false
+    exclude: ['aws-sdk']
+    target: 'node18'
+    platform: 'node'
+    concurrency: 10
+  dotenv:
+    path: ../.env
+
