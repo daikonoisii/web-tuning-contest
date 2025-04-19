@@ -14,6 +14,9 @@ init_mac:
 		git switch -c $(STUDENT_ID)/main; \
 	fi
 
+init_aws:
+	./scripts/aws_login.sh $(ENV)
+
 generate-deploy:
 	set -o allexport && source .env && envsubst < .github/workflows/deploy.template.yml > .github/workflows/deploy.yml
 	set -o allexport && source .env && envsubst < .github/ecs/task-def.template.json > .github/ecs/task-def.json
