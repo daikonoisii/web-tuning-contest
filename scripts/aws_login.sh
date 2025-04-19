@@ -37,3 +37,12 @@ aws configure set output json --profile "$PROFILE"
 
 echo "✅ プロファイル '$PROFILE' を設定しました（ファイル: $ENV_FILE）"
 
+# 正しく設定されたか確認（STS）
+echo "🔍 AWS CLI 接続確認中..."
+
+if aws sts get-caller-identity --profile "$PROFILE" > /dev/null 2>&1; then
+  echo "✅ プロファイル '$PROFILE' で AWS に正常にアクセスできました"
+else
+  echo "❌ プロファイル '$PROFILE' で AWS にアクセスできませんでした"
+  exit 1
+fi
