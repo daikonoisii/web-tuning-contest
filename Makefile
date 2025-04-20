@@ -42,15 +42,19 @@ clean_lighthouse_lambda:
 
 invoke_lighthouse_lambda:
 	@echo "🚀 Invoking Lambda function runLighthouse-dev via AWS CLI..."
-	cd lighthouse-flows-generator && \
-	echo "$$EVENT_JSON" > event.json && \
-	AWS_PROFILE=admin aws lambda invoke \
-		--function-name run-lighthouse \
-		--region $(AWS_REGION) \
-		--payload fileb://event.json \
-		output.json && \
-	cat output.json && \
-	rm event.json
+	@bash -c '\
+		. ./scripts/assume-role.sh \
+			--role-name $(LIGHTHOUSE_LAMBDA_ROLE_NAME) \
+			--profile admin; \
+		cd lighthouse-flows-generator; \
+		AWS_PROFILE=admin aws lambda invoke \
+			--function-name $(LIGHTHOUSE_FUNCTION_NAME) \
+			--region $(MY_AWS_REGION) \
+			--cli-binary-format raw-in-base64-out \
+			--payload fileb://payload.json \
+			output.json; \
+		cat output.json; \
+		rm event.json;'
 	@echo "✅ Lambda invocation complete."
 
 init_mac:
