@@ -1,3 +1,4 @@
+-include .env.admin
 include .env
 
 .PHONY: init_mac generate-deploy
@@ -10,9 +11,24 @@ build_lighthouse_lambda:
 	cd ./lighthouse-flows-generator && export $$(cat ../.env | xargs) && npx serverless package
 	@echo "✅ Build complete. Output in .serverless/"
 
+STAGE ?= dev
+
 push_lighthouse_lambda:
-	@echo "🚀 Deploying to AWS (dev stage)..."
-	cd ./lighthouse-flows-generator && AWS_PROFILE=admin npx serverless deploy --stage dev
+	@echo "🚀 Deploying to AWS ($(STAGE) stage)..."
+	@bash -c '\
+		. ./scripts/assume-role.sh \
+			--role-name $(LIGHTHOUSE_LAMBDA_ROLE_NAME) \
+			--profile admin; \
+		ENV_VARS="$$ENV_VARS \
+			AWS_REGION=$(AWS_REGION) \
+			S3_BUCKET_NAME=$(S3_BUCKET_NAME) \
+			LIGHTHOUSE_FUNCTION_NAME=$(LIGHTHOUSE_FUNCTION_NAME) \
+			AWS_ACCESS_KEY_ID=$$AWS_ACCESS_KEY_ID \
+			AWS_SECRET_ACCESS_KEY=$$AWS_SECRET_ACCESS_KEY \
+			AWS_SESSION_TOKEN=$$AWS_SESSION_TOKEN"; \
+		cd ./lighthouse-flows-generator; \
+		env $$ENV_VARS npx serverless print; \
+		env $$ENV_VARS npx serverless deploy --stage $(STAGE) '\
 	@echo "✅ Deployment complete."
 
 clean_lighthouse_lambda:
