@@ -36,7 +36,12 @@ invoke_lighthouse_lambda:
 	@echo "✅ Lambda invocation complete."
 
 init_mac:
-	bash -c "brew install gettext && brew link --force gettext && which envsubst && envsubst --version"
+	bash -c "\
+	  brew install gettext && \
+	  brew install jq && \
+	  brew link --force gettext && \
+	  which envsubst && envsubst --version && \
+	  jq --version"
 	git checkout main
 	git pull
 	@if git ls-remote --exit-code --heads origin $(STUDENT_ID)/main; then \
