@@ -48,8 +48,6 @@ invoke_lighthouse_lambda:
 			--role-name $(LIGHTHOUSE_LAMBDA_ROLE_NAME) \
 			--profile admin; \
 		cd lighthouse-flows-generator; \
-		echo ✅：payload.json; \
-		cat payload.json | jq; \
 		AWS_PROFILE=admin aws lambda invoke \
 			--function-name $(LIGHTHOUSE_FUNCTION_NAME) \
 			--region $(MY_AWS_REGION) \
