@@ -11,7 +11,9 @@ export const handler = async (
   ) => {
   console.log("Event:", event);
 
-  const body = JSON.parse(event.body || "{}");
+  const body = typeof event.body === 'string'
+  ? JSON.parse(event.body)
+  : event.body || event;
   const urls: string[] = body.urls;
   const studentId: string = body.student_id
 
