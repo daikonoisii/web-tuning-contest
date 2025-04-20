@@ -12,30 +12,17 @@ provider:
 functions:
   runLighthouse:
     name: ${env:LIGHTHOUSE_FUNCTION_NAME}
-    handler: src/commands/generate.handler
+    handler: dist/commands/generate.handler
     memorySize: 1024
     timeout: 120
-
-plugins:
-  - serverless-esbuild
 
 package:
   individually: true
   exclude:
+    - src/**
+    - tsconfig.json
     - README.md
     - 計画書
     - .gitignore
     - .npmignore
     - bin
-
-
-custom:
-  esbuild:
-    bundle: true
-    minify: true
-    sourcemap: false
-    exclude: ['aws-sdk']
-    target: 'node18'
-    platform: 'node'
-    concurrency: 10
-

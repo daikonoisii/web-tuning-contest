@@ -29,6 +29,7 @@ push_lighthouse_lambda:
 			AWS_SECRET_ACCESS_KEY=$$AWS_SECRET_ACCESS_KEY \
 			AWS_SESSION_TOKEN=$$AWS_SESSION_TOKEN"; \
 		cd ./lighthouse-flows-generator; \
+		npm run build; \
 		env $$ENV_VARS npx serverless print; \
 		env $$ENV_VARS npx serverless deploy --stage $(STAGE) '\
 	@echo "✅ Deployment complete."
@@ -47,6 +48,8 @@ invoke_lighthouse_lambda:
 			--role-name $(LIGHTHOUSE_LAMBDA_ROLE_NAME) \
 			--profile admin; \
 		cd lighthouse-flows-generator; \
+		echo ✅：payload.json; \
+		cat payload.json | jq; \
 		AWS_PROFILE=admin aws lambda invoke \
 			--function-name $(LIGHTHOUSE_FUNCTION_NAME) \
 			--region $(MY_AWS_REGION) \
