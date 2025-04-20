@@ -5,7 +5,7 @@ frameworkVersion: '3'
 provider:
   name: aws
   runtime: nodejs18.x
-  region: ${env:AWS_REGION}
+  region: ${env:MY_AWS_REGION}
   environment:
     S3_BUCKET_NAME: ${env:S3_BUCKET_NAME}
 
@@ -17,7 +17,6 @@ functions:
     timeout: 120
 
 plugins:
-  - serverless-dotenv-plugin
   - serverless-esbuild
 
 package:
@@ -39,6 +38,4 @@ custom:
     target: 'node18'
     platform: 'node'
     concurrency: 10
-  dotenv:
-    path: ../.env
 

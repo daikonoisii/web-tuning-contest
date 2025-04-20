@@ -32,7 +32,7 @@ set +a
 # aws configure に設定
 aws configure set aws_access_key_id "$AWS_ACCESS_KEY_ID" --profile "$PROFILE"
 aws configure set aws_secret_access_key "$AWS_SECRET_ACCESS_KEY" --profile "$PROFILE"
-aws configure set region "$AWS_REGION" --profile "$PROFILE"
+aws configure set region "$MY_AWS_REGION" --profile "$PROFILE"
 aws configure set output json --profile "$PROFILE"
 
 echo "✅ プロファイル '$PROFILE' を設定しました（ファイル: $ENV_FILE）"
