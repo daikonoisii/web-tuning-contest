@@ -12,6 +12,31 @@ provider:
       lighthouse:
         path: .
         file: Dockerfile
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - ecr:GetAuthorizationToken
+          Resource: "*"
+        - Effect: Allow
+          Action:
+            - ecr:BatchGetImage
+            - ecr:GetDownloadUrlForLayer
+          Resource:
+            - arn:aws:ecr:${env:MY_AWS_REGION}:${env:AWS_ACCOUNT_ID}:repository/serverless-lighthouse-flows-generator-dev
+            - arn:aws:ecr:${env:MY_AWS_REGION}:${env:AWS_ACCOUNT_ID}:repository/serverless-lighthouse-flows-generator-stg
+        - Effect: Allow
+          Action:
+            - s3:PutObject
+          Resource:
+            - arn:aws:s3:::${env:S3_BUCKET_NAME}/*
+        - Effect: Allow
+          Action:
+            - ecr:GetRepositoryPolicy
+          Resource:
+            - arn:aws:ecr:${env:MY_AWS_REGION}:${env:AWS_ACCOUNT_ID}:repository/serverless-lighthouse-flows-generator-dev
+
 
 functions:
   runLighthouse:
