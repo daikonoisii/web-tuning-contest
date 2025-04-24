@@ -4,17 +4,21 @@ frameworkVersion: '3'
 
 provider:
   name: aws
-  runtime: nodejs18.x
   region: ${env:MY_AWS_REGION}
   environment:
     S3_BUCKET_NAME: ${env:S3_BUCKET_NAME}
+  ecr:
+    images:
+      lighthouse:
+        path: .
+        file: Dockerfile
 
 functions:
   runLighthouse:
-    name: ${env:LIGHTHOUSE_FUNCTION_NAME}
-    handler: dist/commands/generate.handler
-    memorySize: 1024
-    timeout: 120
+    image:
+      name: lighthouse
+    memorySize: 2048
+    timeout: 180
 
 package:
   individually: true

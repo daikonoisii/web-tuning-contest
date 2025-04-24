@@ -1,21 +1,21 @@
-import chromium from "chrome-aws-lambda";
-import puppeteer from "puppeteer-core";
+import puppeteer, { type LaunchOptions } from "puppeteer";
 import { S3 } from "aws-sdk";
-import type { APIGatewayProxyEvent, Context,} from "aws-lambda";
+import type { APIGatewayProxyEvent, Context } from "aws-lambda";
 // @ts-ignore
 import { startFlow } from "lighthouse/lighthouse-core/fraggle-rock/api.js";
 
 export const handler = async (
   event: APIGatewayProxyEvent,
   context: Context
-  ) => {
+) => {
   console.log("Event:", event);
 
   const body = typeof event.body === 'string'
-  ? JSON.parse(event.body)
-  : event.body || event;
+    ? JSON.parse(event.body)
+    : event.body || event;
+
   const urls: string[] = body.urls;
-  const studentId: string = body.student_id
+  const studentId: string = body.student_id;
 
   const s3 = new S3();
 
@@ -33,13 +33,14 @@ export const handler = async (
     };
   }
 
-  const browser = await puppeteer.launch({
-    args: chromium.args,
-    defaultViewport: chromium.defaultViewport,
-    executablePath: await chromium.executablePath,
-    headless: chromium.headless,
+  const options: LaunchOptions & { ignoreHTTPSErrors?: boolean } = {
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
     timeout: 120000,
-  });
+    ignoreHTTPSErrors: true,
+  };
+  
+  const browser = await puppeteer.launch(options);
 
   const page = await browser.newPage();
 
@@ -48,7 +49,7 @@ export const handler = async (
   const flow = await startFlow(page, { name });
 
   for (const url of urls) {
-    await flow.navigate(url)
+    await flow.navigate(url);
   }
 
   const report = await flow.generateReport();
@@ -62,6 +63,7 @@ export const handler = async (
       body: JSON.stringify({ error: "S3_BUCKET_NAME is not defined in env" }),
     };
   }
+
   await s3.putObject({
     Bucket: bucketName,
     Key: `${studentId}/${name}.html`,
