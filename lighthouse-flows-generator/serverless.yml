@@ -40,6 +40,7 @@ provider:
 
 functions:
   runLighthouse:
+    name: ${env:LIGHTHOUSE_FUNCTION_NAME}
     image:
       name: lighthouse
     memorySize: 2048
