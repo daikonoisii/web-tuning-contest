@@ -1,5 +1,5 @@
 # Dockerfile for Puppeteer + Lighthouse on AWS Lambda
-FROM public.ecr.aws/lambda/nodejs:18
+FROM --platform=linux/amd64 public.ecr.aws/lambda/nodejs:18
 
 RUN yum install -y \
     atk \
@@ -29,5 +29,3 @@ COPY package*.json ./
 RUN npm install
 
 COPY . .
-
-CMD ["dist/commands/generate.handler"]

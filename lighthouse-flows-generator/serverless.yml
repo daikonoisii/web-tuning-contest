@@ -7,6 +7,7 @@ provider:
   region: ${env:MY_AWS_REGION}
   environment:
     S3_BUCKET_NAME: ${env:S3_BUCKET_NAME}
+  architecture: x86_64
   ecr:
     images:
       lighthouse:
@@ -43,6 +44,8 @@ functions:
     name: ${env:LIGHTHOUSE_FUNCTION_NAME}
     image:
       name: lighthouse
+      command:
+        - dist/index.handler
     memorySize: 2048
     timeout: 180
 
