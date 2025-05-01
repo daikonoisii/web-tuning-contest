@@ -38,6 +38,7 @@ export const handler = async (
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
     timeout: 120000,
     ignoreHTTPSErrors: true,
+    executablePath: '/usr/bin/google-chrome-stable',
   };
   
   const browser = await puppeteer.launch(options);
