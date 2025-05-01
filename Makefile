@@ -55,8 +55,7 @@ invoke_lighthouse_lambda:
 			--cli-binary-format raw-in-base64-out \
 			--payload fileb://payload.json \
 			output.json; \
-		cat output.json; \
-		rm event.json;'
+		cat output.json;'
 	@echo "✅ Lambda invocation complete."
 
 init_mac:
