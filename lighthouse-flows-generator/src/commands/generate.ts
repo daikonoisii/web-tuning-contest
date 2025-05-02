@@ -1,5 +1,6 @@
 import puppeteer, { type LaunchOptions, type Browser } from "puppeteer";
 import { S3 } from "aws-sdk";
+import fs from 'node:fs';
 import type { APIGatewayProxyEvent, Context } from "aws-lambda";
 // @ts-ignore
 import { startFlow } from "lighthouse/lighthouse-core/fraggle-rock/api.js";
@@ -8,6 +9,13 @@ export const handler = async (
   event: APIGatewayProxyEvent,
   context: Context
 ) => {
+  const userDataDir = '/tmp/chrome-user-data';
+  // tmp/chrome-user-dataをクリア
+  if (fs.existsSync(userDataDir)) {
+    fs.rmSync(userDataDir, { recursive: true, force: true });
+  }
+  fs.mkdirSync(userDataDir, { recursive: true });
+
   console.log("Event:", event);
 
   const body = typeof event.body === 'string'
@@ -50,7 +58,9 @@ export const handler = async (
     dumpio: true,
     env: {
       ...process.env,
+      HOME: '/tmp',
       XDG_CACHE_HOME: '/tmp/chrome-cache',
+      XDG_CONFIG_HOME: '/tmp/.config',
     },
   };
   let browser: Browser;
