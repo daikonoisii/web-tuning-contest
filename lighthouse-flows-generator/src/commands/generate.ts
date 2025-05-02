@@ -81,11 +81,11 @@ export const handler = async (
     page,
     {
       name,
-      // デフォルト 120000ms を 300000ms（5分）に延長
+      // デフォルト 120000ms を 240000ms（4分）に延長
       configContext: {
         settingsOverrides: {
-          maxWaitForLoad: 300_000,
-          maxWaitForFcp: 300_000,
+          maxWaitForLoad: 240_000,
+          maxWaitForFcp: 240_000,
         }
       }
     }

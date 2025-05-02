@@ -46,8 +46,9 @@ functions:
       name: lighthouse
       command:
         - dist/index.handler
-    memorySize: 2048
-    timeout: 180
+    memorySize: 2300
+    timeout: 600
+    ephemeralStorageSize: 700
 
 package:
   individually: true
