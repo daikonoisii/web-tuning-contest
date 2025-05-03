@@ -1,0 +1,61 @@
+service: lighthouse-flows-generator
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  region: ${env:MY_AWS_REGION}
+  environment:
+    S3_BUCKET_NAME: ${env:S3_BUCKET_NAME}
+  architecture: x86_64
+  ecr:
+    images:
+      lighthouse:
+        path: .
+        file: Dockerfile
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - ecr:GetAuthorizationToken
+          Resource: "*"
+        - Effect: Allow
+          Action:
+            - ecr:BatchGetImage
+            - ecr:GetDownloadUrlForLayer
+          Resource:
+            - arn:aws:ecr:${env:MY_AWS_REGION}:${env:AWS_ACCOUNT_ID}:repository/serverless-lighthouse-flows-generator-dev
+            - arn:aws:ecr:${env:MY_AWS_REGION}:${env:AWS_ACCOUNT_ID}:repository/serverless-lighthouse-flows-generator-stg
+        - Effect: Allow
+          Action:
+            - s3:PutObject
+          Resource:
+            - arn:aws:s3:::${env:S3_BUCKET_NAME}/*
+        - Effect: Allow
+          Action:
+            - ecr:GetRepositoryPolicy
+          Resource:
+            - arn:aws:ecr:${env:MY_AWS_REGION}:${env:AWS_ACCOUNT_ID}:repository/serverless-lighthouse-flows-generator-dev
+
+
+functions:
+  runLighthouse:
+    name: ${env:LIGHTHOUSE_FUNCTION_NAME}
+    image:
+      name: lighthouse
+      command:
+        - dist/index.handler
+    memorySize: 2048
+    timeout: 180
+
+package:
+  individually: true
+  exclude:
+    - src/**
+    - tsconfig.json
+    - README.md
+    - 計画書
+    - .gitignore
+    - .npmignore
+    - bin

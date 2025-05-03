@@ -1,3 +1,6 @@
 .env*
 .github/workflows/deploy.yml
 .github/ecs/task-def.json
+assume-role-config.json
+event.json
+lighthouse-flows-generator/output.json
