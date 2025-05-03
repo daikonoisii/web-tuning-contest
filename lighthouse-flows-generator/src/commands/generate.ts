@@ -1,5 +1,6 @@
-import puppeteer, { type LaunchOptions } from "puppeteer";
+import puppeteer, { type LaunchOptions, type Browser } from "puppeteer";
 import { S3 } from "aws-sdk";
+import fs from 'node:fs';
 import type { APIGatewayProxyEvent, Context } from "aws-lambda";
 // @ts-ignore
 import { startFlow } from "lighthouse/lighthouse-core/fraggle-rock/api.js";
@@ -8,6 +9,13 @@ export const handler = async (
   event: APIGatewayProxyEvent,
   context: Context
 ) => {
+  const userDataDir = '/tmp/chrome-user-data';
+  // tmp/chrome-user-dataをクリア
+  if (fs.existsSync(userDataDir)) {
+    fs.rmSync(userDataDir, { recursive: true, force: true });
+  }
+  fs.mkdirSync(userDataDir, { recursive: true });
+
   console.log("Event:", event);
 
   const body = typeof event.body === 'string'
@@ -35,22 +43,60 @@ export const handler = async (
 
   const options: LaunchOptions & { ignoreHTTPSErrors?: boolean } = {
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    timeout: 120000,
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--single-process',
+      '--disable-gpu',
+      '--no-zygote',
+      '--user-data-dir=/tmp/chrome-user-data',
+    ],
+    timeout: 60000,
     ignoreHTTPSErrors: true,
+    executablePath: '/usr/bin/google-chrome-stable',
+    dumpio: true,
+    env: {
+      ...process.env,
+      HOME: '/tmp',
+      XDG_CACHE_HOME: '/tmp/chrome-cache',
+      XDG_CONFIG_HOME: '/tmp/.config',
+    },
   };
-  
-  const browser = await puppeteer.launch(options);
+  let browser: Browser;
+  try {
+    browser = await puppeteer.launch(options);
+    console.log("ブラウザ起動成功");
+  } catch (err) {
+    console.error("ブラウザ起動失敗:", err);
+    throw err;
+  }
+  console.timeEnd("chrome-launch-time");
 
   const page = await browser.newPage();
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const name = `lighthouse-${timestamp}`;
-  const flow = await startFlow(page, { name });
+  const flow = await startFlow(
+    page,
+    {
+      name,
+      // デフォルト 120000ms を 240000ms（4分）に延長
+      configContext: {
+        settingsOverrides: {
+          maxWaitForLoad: 240_000,
+          maxWaitForFcp: 240_000,
+        }
+      }
+    }
+  );
 
   for (const url of urls) {
+    console.log("計測開始：",url);
     await flow.navigate(url);
+    console.log("計測完了：",url);
   }
+
 
   const report = await flow.generateReport();
   await browser.close();
