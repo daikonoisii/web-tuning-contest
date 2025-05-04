@@ -6,7 +6,7 @@ on:
   pull_request:
     types: [closed]
     branches:
-      - ${{ secrets.STUDENT_ID }}/main
+      - ${STUDENT_ID}/main
 
 # 環境変数
 env:
