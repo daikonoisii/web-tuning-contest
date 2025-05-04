@@ -1,0 +1,29 @@
+name: Catch Merged
+
+# ${STUDENT_ID}/mainにpull_requestがcloseされたときに実行
+# マージの是非は後ほどフィルタリング
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - ${STUDENT_ID}/main
+
+jobs:
+  dispatch:
+    # PRがマージされた時のみ実行
+    if: github.event.pull_request.merged == true
+    # github Actionの仮想実行マシーンの指定 ubuntu最新版
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send repository_dispatch
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          token: ${{ secrets.LIGHTHOUSE_PAT_TOKEN }}
+          repository: ${LIGHTHOUSE_ORG}/${LIGHTHOUSE_REPOSITORY_NAME}
+          event-type: run-tuning
+          client-payload: |
+            {
+              "STUDENT_ID": "${STUDENT_ID}"
+            }
+
