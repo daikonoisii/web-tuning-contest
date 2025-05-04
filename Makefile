@@ -63,9 +63,12 @@ init_mac:
 	bash -c "\
 	  brew install gettext && \
 	  brew install jq && \
+	  brew install gh && \
 	  brew link --force gettext && \
 	  which envsubst && envsubst --version && \
 	  jq --version"
+	./scripts/sync_github_secrets.sh -r ${LIGHTHOUSE_ORG}/${LIGHTHOUSE_REPOSITORY_NAME} -f ./.env.github.secrets.work_space
+	./scripts/sync_github_secrets.sh -r ${WORK_SPACE_ORG}/${WORK_SPACE_REPOSITORY_NAME} -f ./.env.github.secrets.lighthouse
 	git stash --include-untracked
 	git checkout main
 	git pull
