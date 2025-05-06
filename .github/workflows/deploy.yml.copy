@@ -24,6 +24,8 @@ jobs:
           event-type: run-tuning
           client-payload: |
             {
+              "student_repo": "${{ github.repository }}",
+              "student_branch": "${{ github.ref_name }}",
               "STUDENT_ID": "${STUDENT_ID}"
             }
 
