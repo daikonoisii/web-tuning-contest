@@ -66,19 +66,28 @@ init_mac:
 	  brew link --force gettext && \
 	  which envsubst && envsubst --version && \
 	  jq --version"
-	git checkout main
-	git pull
-	@if git ls-remote --exit-code --heads origin $(STUDENT_ID)/main; then \
+	cd ./work_space/$(REPOSITORY_NAME); \
+	git stash --include-untracked; \
+	git checkout main; \
+	git pull; \
+	if git ls-remote --exit-code --heads origin $(STUDENT_ID)/main; then \
 		git switch $(STUDENT_ID)/main; \
 	elif git show-ref --quiet refs/heads/$(STUDENT_ID)/main; then \
 		git switch $(STUDENT_ID)/main; \
 	else \
 		git switch -c $(STUDENT_ID)/main; \
-	fi
+	fi; \
+	mkdir -p .github/workflows; \
+	set -o allexport && source ../../.env && envsubst < ../../.github/workflows/deploy.yml.copy  > ./.github/workflows/deploy.yml; \
+	git add ./.github/workflows/deploy.yml; \
+	git commit -m "feat: :sparkles: create github action branch $(STUDENT_ID)/main"; \
+	git push -u origin $(STUDENT_ID)/main
+	@echo "✅ finish"
 
 init_aws:
 	./scripts/aws_login.sh $(ENV)
 
-generate-deploy:
-	set -o allexport && source .env && envsubst < .github/workflows/deploy.template.yml > .github/workflows/deploy.yml
-	set -o allexport && source .env && envsubst < .github/ecs/task-def.template.json > .github/ecs/task-def.json
+init_admin:
+	brew install gh
+	./scripts/sync_github_secrets.sh -r ${LIGHTHOUSE_ORG}/${LIGHTHOUSE_REPOSITORY_NAME} -f ./.env.github.secrets.lighthouse
+	./scripts/sync_github_secrets.sh -r ${WORK_SPACE_ORG}/${WORK_SPACE_REPOSITORY_NAME} -f ./.env.github.secrets.work_space

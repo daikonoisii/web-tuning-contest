@@ -1,0 +1,88 @@
+name: Deploy to ECS Fargate
+
+#  サブモジュールでMRがマージされたときに実行
+on:
+  repository_dispatch:
+    types: [run-tuning]
+
+# 環境変数
+env:
+  STUDENT_ID: ${{ github.event.client_payload.STUDENT_ID }}
+  TARGET_REPOSITORY: ${{ github.event.client_payload.student_repo }}
+  TARGET_BRANCH: ${{ github.event.client_payload.student_branch }}
+  ENTRY_POINT_COMMAND: ${{ toJson(github.event.client_payload.ENTRY_POINT_COMMAND) }}
+  START_COMMAND: ${{ toJson(github.event.client_payload.START_COMMAND) }}
+  ENVIRONMENT_COMMAND: ${{ toJson(github.event.client_payload.ENVIRONMENT_COMMAND) }}
+  MY_AWS_REGION: ${{ secrets.AWS_REGION }}
+  AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+  DEPLOY_TASK_ROLE_NAME: ${{ secrets.DEPLOY_TASK_ROLE_NAME }}
+  ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}-${{ github.event.client_payload.STUDENT_ID }}
+  CONTAINER_NAME: ${{ secrets.CONTAINER_NAME }}
+  ECS_CLUSTER: ${{ secrets.ECS_CLUSTER }}
+  ECS_SERVICE: ${{ secrets.ECS_SERVICE }}-${{ github.event.client_payload.STUDENT_ID }}
+jobs:
+  # deploy job
+  deploy:
+    # github Actionの仮想実行マシーンの指定 ubuntu最新版
+    runs-on: ubuntu-latest
+    steps:
+      # 仮想マシーンにリポジトリをチェックアウト
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
+
+      # 計測対象のリポジトリ/ブランチを別ディレクトリにチェックアウト
+      - name: Checkout work_space repo
+        uses: actions/checkout@v3
+        with:
+          repository: ${{ env.TARGET_REPOSITORY }}
+          ref: ${{ env.TARGET_BRANCH }}
+          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          path: work-space-repo
+
+      # テンプレートから JSON 生成
+      - name: Substitute envs in ECS task definition
+        uses: danielr1996/envsubst-action@1.1.0
+        with:
+          input:  .github/ecs/task-def.template.json
+          output: .github/ecs/task-def.json
+
+      # AWS の認証情報を設定
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ secrets.IAM_ROLE_NAME }}
+          aws-region: ${{ env.MY_AWS_REGION }}
+
+      # ECR にログイン
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # Docker ビルド & プッシュ
+      - name: Build, tag, and push image to ECR
+        run: |
+          URI=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+          docker build \
+            -f work-space-repo/${{ secrets.DOCKERFILE_PATH }} \
+            -t $URI \
+            work-space-repo
+          docker push $URI
+
+      # テンプレートを元に、使用するDockerイメージだけ差し替えて、新しいタスク定義を作成する
+      - name: Render ECS task definition
+        id: render-task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: .github/ecs/task-def.json
+          container-name: ${{ env.CONTAINER_NAME }}
+          image: ${{ steps.login-ecr.outputs.registry }}/${{env.ECR_REPOSITORY}}:latest
+
+      # ECSでデプロイ
+      - name: Deploy to ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          cluster: ${{ env.ECS_CLUSTER }}
+          service: ${{ env.ECS_SERVICE }}
+          task-definition: ${{ steps.render-task-def.outputs.task-definition }}
