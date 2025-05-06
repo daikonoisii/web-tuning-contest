@@ -5,6 +5,9 @@ on:
   repository_dispatch:
     types: [run-tuning]
 
+permissions:
+  id-token: write
+
 # 環境変数
 env:
   STUDENT_ID: ${{ github.event.client_payload.STUDENT_ID }}
