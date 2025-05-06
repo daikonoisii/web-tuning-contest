@@ -66,21 +66,6 @@ init_mac:
 	  brew link --force gettext && \
 	  which envsubst && envsubst --version && \
 	  jq --version"
-	git stash --include-untracked
-	git checkout main
-	git pull
-	@if git ls-remote --exit-code --heads origin $(STUDENT_ID)/main; then \
-		git switch $(STUDENT_ID)/main; \
-	elif git show-ref --quiet refs/heads/$(STUDENT_ID)/main; then \
-		git switch $(STUDENT_ID)/main; \
-	else \
-		git switch -c $(STUDENT_ID)/main; \
-	fi
-	set -o allexport && source .env && envsubst < .github/workflows/deploy.yml.template > .github/workflows/deploy.yml
-	set -o allexport && source .env && envsubst < .github/ecs/task-def.template.json > .github/ecs/task-def.json
-	git add .github/ecs/task-def.json .github/workflows/deploy.yml
-	git commit -m "feat: :sparkles: create github action branch $(STUDENT_ID)/main"
-	git push -u origin $(STUDENT_ID)/main
 	cd ./work_space/$(REPOSITORY_NAME); \
 	git stash --include-untracked; \
 	git checkout main; \

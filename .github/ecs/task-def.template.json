@@ -14,7 +14,10 @@
             "hostPort": 80,
             "protocol": "tcp"
           }
-        ]
+        ],
+        "entryPoint": ${ENTRY_POINT_COMMAND},
+        "command": ${START_COMMAND},
+        "environment": ${ENVIRONMENT_COMMAND}
       }
     ],
     "requiresCompatibilities": ["FARGATE"],
