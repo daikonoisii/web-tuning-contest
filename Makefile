@@ -1,4 +1,11 @@
--include .env.admin
+ifneq ($(filter create-ecr-repository,$(MAKECMDGOALS)),)
+  # create-ecr-repositoryならparticipant 用を読み込む
+  -include .env.participant
+else
+  # admin 用を読み込む
+  include .env.admin
+endif
+
 include .env
 
 .PHONY: init_mac generate-deploy
