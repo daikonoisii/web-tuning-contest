@@ -89,6 +89,7 @@ init_mac:
 	git add ./.github/workflows/deploy.yml; \
 	git commit -m "feat: :sparkles: create github action branch $(STUDENT_ID)/main"; \
 	git push -u origin $(STUDENT_ID)/main
+	$(MAKE) create-ecr-repository
 	@echo "✅ finish"
 
 init_aws:
@@ -121,3 +122,9 @@ create-oidc-provider:
 	  --url "https://$(OIDC_HOST)" \
 	  --thumbprint-list "$$THUMB" \
 	  --client-id-list "$(CLIENT_ID)"
+
+create-ecr-repository:
+	. ./scripts/assume-role.sh \
+			--role-name $(ECR_ROLE_NAME) \
+			--profile participant; \
+	aws ecr create-repository --repository-name $(ECR_REPOSITORY)-$(STUDENT_ID) --region ap-northeast-1
