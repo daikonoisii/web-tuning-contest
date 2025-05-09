@@ -91,3 +91,26 @@ init_admin:
 	brew install gh
 	./scripts/sync_github_secrets.sh -r ${LIGHTHOUSE_ORG}/${LIGHTHOUSE_REPOSITORY_NAME} -f ./.env.github.secrets.lighthouse
 	./scripts/sync_github_secrets.sh -r ${WORK_SPACE_ORG}/${WORK_SPACE_REPOSITORY_NAME} -f ./.env.github.secrets.work_space
+	$(MAKE) create-oidc-provider
+
+thumbprint:
+	@echo "→ $(OIDC_HOST) の証明書 thumbprint を取得中..." >&2
+	@openssl s_client \
+		-connect $(OIDC_HOST):443 \
+		-servername $(OIDC_HOST) \
+		-showcerts </dev/null 2>/dev/null \
+	| openssl x509 -noout -fingerprint -sha1 \
+	| sed 's/^.*=//' \
+	| sed 's/://g' \
+	| tr '[:upper:]' '[:lower:]'
+
+create-oidc-provider:
+	@THUMB=$$(make thumbprint); \
+	echo "→ AWS に OIDC プロバイダーを作成 (URL=https://$(OIDC_HOST), thumbprint=$$THUMB)" >&2; \
+	. ./scripts/assume-role.sh \
+			--role-name $(OIDC_ROLE_NAME) \
+			--profile admin; \
+	aws iam create-open-id-connect-provider \
+	  --url "https://$(OIDC_HOST)" \
+	  --thumbprint-list "$$THUMB" \
+	  --client-id-list "$(CLIENT_ID)"
