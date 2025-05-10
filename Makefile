@@ -162,15 +162,6 @@ create-ecs-cluster:
 	  echo "✅ Cluster created."; \
 	fi
 
-test:
-	. ./scripts/assume-role.sh \
-		--role-name $(ECS_ROLE_NAME) \
-		--profile admin; \
-	aws ecs describe-clusters \
-		--clusters $(ECS_CLUSTER) \
-		--region $(MY_AWS_REGION) \
-		--query "clusters[?status=='ACTIVE'].clusterName" \
-		--output text
 
 create-vpc:
 	. ./scripts/assume-role.sh \
