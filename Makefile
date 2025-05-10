@@ -100,6 +100,7 @@ init_admin:
 	./scripts/sync_github_secrets.sh -r ${LIGHTHOUSE_ORG}/${LIGHTHOUSE_REPOSITORY_NAME} -f ./.env.github.secrets.lighthouse
 	./scripts/sync_github_secrets.sh -r ${WORK_SPACE_ORG}/${WORK_SPACE_REPOSITORY_NAME} -f ./.env.github.secrets.work_space
 	$(MAKE) create-oidc-provider
+	$(MAKE) create-ecs-cluster
 
 thumbprint:
 	@echo "→ $(OIDC_HOST) の証明書 thumbprint を取得中..." >&2
@@ -128,3 +129,33 @@ create-ecr-repository:
 			--role-name $(ECR_ROLE_NAME) \
 			--profile participant; \
 	aws ecr create-repository --repository-name $(ECR_REPOSITORY)-$(STUDENT_ID) --region ap-northeast-1
+
+create-ecs-cluster:
+	. ./scripts/assume-role.sh \
+		--role-name $(ECS_ROLE_NAME) \
+		--profile admin; \
+	if aws ecs describe-clusters \
+	      --clusters $(ECS_CLUSTER) \
+	      --region $(MY_AWS_REGION) \
+	      --query "clusters[?status=='ACTIVE'].clusterName" \
+	      --output text 2>/dev/null \
+	      | grep -q $(ECS_CLUSTER); then \
+	  echo "✔ Cluster '$(ECS_CLUSTER)' already exists."; \
+	else \
+	  echo "🔧 Creating ECS cluster '$(ECS_CLUSTER)'..."; \
+	  aws ecs create-cluster \
+	    --cluster-name $(ECS_CLUSTER) \
+	    --capacity-providers FARGATE \
+	    --region $(MY_AWS_REGION); \
+	  echo "✅ Cluster created."; \
+	fi
+
+test:
+	. ./scripts/assume-role.sh \
+		--role-name $(ECS_ROLE_NAME) \
+		--profile admin; \
+	aws ecs describe-clusters \
+		--clusters $(ECS_CLUSTER) \
+		--region $(MY_AWS_REGION) \
+		--query "clusters[?status=='ACTIVE'].clusterName" \
+		--output text
