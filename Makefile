@@ -109,6 +109,9 @@ init_admin:
 		make --no-print-directory -s crate-security-group)); \
 	SG_LAMBDA=$${VARS[0]}; \
 	SG_ECS=$${VARS[1]}; \
+	SG_LAMBDA=$$SG_LAMBDA \
+	SG_ECS=$$SG_ECS \
+	make --no-print-directory -s create-security-role; \
 	$(MAKE) create-ecs-cluster
 
 thumbprint:
@@ -193,3 +196,10 @@ crate-security-group:
 		--group-name $(SG_ECS_NAME) --description "ECS inbound from Lambda" \
 		--vpc-id $$VPC_ID --query 'GroupId' --output text); \
 	echo "$$SG_LAMBDA $$SG_ECS"
+
+create-security-role:
+	. ./scripts/assume-role.sh \
+		--role-name $(VPC_ROLE_NAME) \
+		--profile admin; \
+	aws ec2 authorize-security-group-ingress --group-id $$SG_ECS \
+		--protocol tcp --port $(APP_PORT) --source-group $$SG_LAMBDA; \
