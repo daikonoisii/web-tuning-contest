@@ -100,6 +100,10 @@ init_admin:
 	./scripts/sync_github_secrets.sh -r ${LIGHTHOUSE_ORG}/${LIGHTHOUSE_REPOSITORY_NAME} -f ./.env.github.secrets.lighthouse
 	./scripts/sync_github_secrets.sh -r ${WORK_SPACE_ORG}/${WORK_SPACE_REPOSITORY_NAME} -f ./.env.github.secrets.work_space
 	$(MAKE) create-oidc-provider
+	VARS=($$(MAKE --no-print-directory -s create-vpc)); \
+	VPC_ID=$${VARS[0]}; \
+	SUBNET1_ID=$${VARS[1]}; \
+	SUBNET2_ID=$${VARS[2]}; \
 	$(MAKE) create-ecs-cluster
 
 thumbprint:
@@ -159,3 +163,16 @@ test:
 		--region $(MY_AWS_REGION) \
 		--query "clusters[?status=='ACTIVE'].clusterName" \
 		--output text
+
+create-vpc:
+	. ./scripts/assume-role.sh \
+			--role-name $(VPC_ROLE_NAME) \
+			--profile admin; \
+	VPC_ID=$$(aws ec2 create-vpc --cidr-block $(VPC_CIDR) \
+			--region $(MY_AWS_REGION) --query 'Vpc.VpcId' --output text); \
+	aws ec2 modify-vpc-attribute --vpc-id $$VPC_ID --enable-dns-hostnames "{\"Value\":true}"; \
+	SUBNET1_ID=$$(aws ec2 create-subnet --vpc-id $$VPC_ID --cidr-block $(SUBNET1_CIDR) \
+				--availability-zone $(AZ1) --query 'Subnet.SubnetId' --output text); \
+	SUBNET2_ID=$$(aws ec2 create-subnet --vpc-id $$VPC_ID --cidr-block $(SUBNET2_CIDR) \
+				--availability-zone $(AZ2) --query 'Subnet.SubnetId' --output text); \
+	echo "$$VPC_ID $$SUBNET1_ID $$SUBNET2_ID"
