@@ -104,6 +104,11 @@ init_admin:
 	VPC_ID=$${VARS[0]}; \
 	SUBNET1_ID=$${VARS[1]}; \
 	SUBNET2_ID=$${VARS[2]}; \
+	VARS=($$( \
+		VPC_ID=$${VPC_ID} \
+		make --no-print-directory -s crate-security-group)); \
+	SG_LAMBDA=$${VARS[0]}; \
+	SG_ECS=$${VARS[1]}; \
 	$(MAKE) create-ecs-cluster
 
 thumbprint:
@@ -176,3 +181,15 @@ create-vpc:
 	SUBNET2_ID=$$(aws ec2 create-subnet --vpc-id $$VPC_ID --cidr-block $(SUBNET2_CIDR) \
 				--availability-zone $(AZ2) --query 'Subnet.SubnetId' --output text); \
 	echo "$$VPC_ID $$SUBNET1_ID $$SUBNET2_ID"
+
+crate-security-group:
+	. ./scripts/assume-role.sh \
+		--role-name $(VPC_ROLE_NAME) \
+		--profile admin; \
+	SG_LAMBDA=$$(aws ec2 create-security-group \
+		--group-name $(SG_LAMBDA_NAME) --description "Lambda outbound to ECS only" \
+		--vpc-id $$VPC_ID --query 'GroupId' --output text); \
+	SG_ECS=$$(aws ec2 create-security-group \
+		--group-name $(SG_ECS_NAME) --description "ECS inbound from Lambda" \
+		--vpc-id $$VPC_ID --query 'GroupId' --output text); \
+	echo "$$SG_LAMBDA $$SG_ECS"
