@@ -111,7 +111,7 @@ init_admin:
 	SG_ECS=$${VARS[1]}; \
 	SG_LAMBDA=$$SG_LAMBDA \
 	SG_ECS=$$SG_ECS \
-	make --no-print-directory -s create-security-role; \
+	make --no-print-directory -s create-security-rule; \
 	$(MAKE) create-ecs-cluster
 
 thumbprint:
@@ -162,7 +162,6 @@ create-ecs-cluster:
 	  echo "✅ Cluster created."; \
 	fi
 
-
 create-vpc:
 	. ./scripts/assume-role.sh \
 			--role-name $(VPC_ROLE_NAME) \
@@ -188,7 +187,7 @@ crate-security-group:
 		--vpc-id $$VPC_ID --query 'GroupId' --output text); \
 	echo "$$SG_LAMBDA $$SG_ECS"
 
-create-security-role:
+create-security-rule:
 	. ./scripts/assume-role.sh \
 		--role-name $(VPC_ROLE_NAME) \
 		--profile admin; \
