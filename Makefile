@@ -144,7 +144,7 @@ create-ecr-repository:
 
 create-ecs-cluster:
 	. ./scripts/assume-role.sh \
-		--role-name $(ECS_ROLE_NAME) \
+		--role-name $(ECS_ADMIN_ROLE_NAME) \
 		--profile admin; \
 	if aws ecs describe-clusters \
 	      --clusters $(ECS_CLUSTER) \
