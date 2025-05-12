@@ -140,7 +140,7 @@ create-ecr-repository:
 	. ./scripts/assume-role.sh \
 			--role-name $(ECR_ROLE_NAME) \
 			--profile participant; \
-	aws ecr create-repository --repository-name $(ECR_REPOSITORY)-$(STUDENT_ID) --region ap-northeast-1
+	aws ecr create-repository --repository-name $(ECR_REPOSITORY)-$(STUDENT_ID) --region $(MY_AWS_REGION)
 
 create-ecs-cluster:
 	. ./scripts/assume-role.sh \
