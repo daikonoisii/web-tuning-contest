@@ -1,4 +1,7 @@
-ifneq ($(filter create-ecr-repository,$(MAKECMDGOALS)),)
+ifneq ($(filter create-ecr-repository \
+				create-ecs-service \
+				init_mac \
+				register-task-definition,$(MAKECMDGOALS)),)
   # create-ecr-repositoryならparticipant 用を読み込む
   -include .env.participant
 else
@@ -90,6 +93,7 @@ init_mac:
 	git commit -m "feat: :sparkles: create github action branch $(STUDENT_ID)/main"; \
 	git push -u origin $(STUDENT_ID)/main
 	$(MAKE) create-ecr-repository
+	make --no-print-directory -s register-task-definition
 	@echo "✅ finish"
 
 init_aws:
@@ -193,3 +197,14 @@ create-security-rule:
 		--profile admin; \
 	aws ec2 authorize-security-group-ingress --group-id $$SG_ECS \
 		--protocol tcp --port $(APP_PORT) --source-group $$SG_LAMBDA; \
+
+register-task-definition:
+	set -o allexport && source ./.env.participant && source ./.env && envsubst < .github/ecs/task-def.template.json > ./.github/ecs/task-def.json
+	. ./scripts/assume-role.sh \
+		--role-name $(ECS_ROLE_NAME) \
+		--profile participant; \
+	aws ecs register-task-definition \
+		--cli-input-json file://.github/ecs/task-def.json \
+		--query 'taskDefinition.taskDefinitionArn' \
+		--output text \
+		--region ${MY_AWS_REGION};
