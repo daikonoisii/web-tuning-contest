@@ -126,6 +126,12 @@ init_admin:
 	SG_LAMBDA=$$SG_LAMBDA \
 	SG_ECS=$$SG_ECS \
 	make --no-print-directory -s create-security-rule; \
+	VPC_ID=$$VPC_ID \
+	SUBNET1_ID=$$SUBNET1_ID \
+	SUBNET2_ID=$$SUBNET2_ID \
+	SG_LAMBDA=$$SG_LAMBDA \
+	SG_ECS=$$SG_ECS \
+	make --no-print-directory -s push_aws_parameters; \
 	$(MAKE) create-ecs-cluster
 
 thumbprint:
@@ -218,3 +224,19 @@ register-task-definition:
 		--query 'taskDefinition.taskDefinitionArn' \
 		--output text \
 		--region ${MY_AWS_REGION};
+
+push_aws_parameters:
+	. ./scripts/assume-role.sh \
+			--role-name $(PARAMETER_ROLE_NAME) \
+			--profile admin; \
+	TMP_ENV=$$(mktemp); \
+	echo "VPC_ID=$$VPC_ID"       >> $$TMP_ENV; \
+	echo "SUBNET1_ID=$$SUBNET1_ID" >> $$TMP_ENV; \
+	echo "SUBNET2_ID=$$SUBNET2_ID" >> $$TMP_ENV; \
+	echo "SG_LAMBDA=$$SG_LAMBDA"   >> $$TMP_ENV; \
+	echo "SG_ECS=$$SG_ECS"         >> $$TMP_ENV; \
+	env AWS_ACCESS_KEY_ID=$$AWS_ACCESS_KEY_ID \
+	    AWS_SECRET_ACCESS_KEY=$$AWS_SECRET_ACCESS_KEY \
+	    AWS_SESSION_TOKEN=$$AWS_SESSION_TOKEN \
+	    ./scripts/push_aws_parameters.sh -f $$TMP_ENV --prefix /${PARAMETERS_PREFIX}; \
+	rm $$TMP_ENV; \
