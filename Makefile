@@ -1,3 +1,5 @@
+SHELL := /bin/bash
+
 ifneq ($(filter create-ecr-repository \
 				create-ecs-service \
 				init_mac \
