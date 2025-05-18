@@ -1,4 +1,9 @@
-ifneq ($(filter create-ecr-repository,$(MAKECMDGOALS)),)
+SHELL := /bin/bash
+
+ifneq ($(filter create-ecr-repository \
+				create-ecs-service \
+				init_mac \
+				register-task-definition,$(MAKECMDGOALS)),)
   # create-ecr-repositoryならparticipant 用を読み込む
   -include .env.participant
 else
@@ -89,7 +94,21 @@ init_mac:
 	git add ./.github/workflows/deploy.yml; \
 	git commit -m "feat: :sparkles: create github action branch $(STUDENT_ID)/main"; \
 	git push -u origin $(STUDENT_ID)/main
-	$(MAKE) create-ecr-repository
+	if ! RESPONSE=$$(make --no-print-directory -s create-ecr-repository 2>&1); then \
+	  if echo "$$RESPONSE" | grep -q 'RepositoryAlreadyExistsException'; then \
+	    echo "ECRリポジトリは既に存在しています。処理を継続します。"; \
+	  else \
+	    echo "$$RESPONSE"; \
+	    exit 1; \
+	  fi; \
+	fi; \
+	make --no-print-directory -s register-task-definition
+	@VARS=$$(make --no-print-directory -s get_aws_parameters); \
+	SG_ECS=$$(echo $$VARS | jq -r '.SG_ECS') \
+	SG_LAMBDA=$$(echo $$VARS | jq -r '.SG_LAMBDA') \
+	SUBNET1_ID=$$(echo $$VARS | jq -r '.SUBNET1_ID') \
+	SUBNET2_ID=$$(echo $$VARS | jq -r '.SUBNET2_ID') \
+	make --no-print-directory -s create-ecs-service
 	@echo "✅ finish"
 
 init_aws:
@@ -99,7 +118,14 @@ init_admin:
 	brew install gh
 	./scripts/sync_github_secrets.sh -r ${LIGHTHOUSE_ORG}/${LIGHTHOUSE_REPOSITORY_NAME} -f ./.env.github.secrets.lighthouse
 	./scripts/sync_github_secrets.sh -r ${WORK_SPACE_ORG}/${WORK_SPACE_REPOSITORY_NAME} -f ./.env.github.secrets.work_space
-	$(MAKE) create-oidc-provider
+	if ! RESPONSE=$$(make --no-print-directory -s create-oidc-provider 2>&1); then \
+	  if echo "$$RESPONSE" | grep -q 'EntityAlreadyExists'; then \
+	    echo "OIDCプロバイダーは既に存在しています。処理を継続します。"; \
+	  else \
+	    echo "$$RESPONSE"; \
+	    exit 1; \
+	  fi; \
+	fi; \
 	VARS=($$(MAKE --no-print-directory -s create-vpc)); \
 	VPC_ID=$${VARS[0]}; \
 	SUBNET1_ID=$${VARS[1]}; \
@@ -111,7 +137,13 @@ init_admin:
 	SG_ECS=$${VARS[1]}; \
 	SG_LAMBDA=$$SG_LAMBDA \
 	SG_ECS=$$SG_ECS \
-	make --no-print-directory -s create-security-role; \
+	make --no-print-directory -s create-security-rule; \
+	VPC_ID=$$VPC_ID \
+	SUBNET1_ID=$$SUBNET1_ID \
+	SUBNET2_ID=$$SUBNET2_ID \
+	SG_LAMBDA=$$SG_LAMBDA \
+	SG_ECS=$$SG_ECS \
+	make --no-print-directory -s push_aws_parameters; \
 	$(MAKE) create-ecs-cluster
 
 thumbprint:
@@ -140,11 +172,11 @@ create-ecr-repository:
 	. ./scripts/assume-role.sh \
 			--role-name $(ECR_ROLE_NAME) \
 			--profile participant; \
-	aws ecr create-repository --repository-name $(ECR_REPOSITORY)-$(STUDENT_ID) --region ap-northeast-1
+	aws ecr create-repository --repository-name $(ECR_REPOSITORY)-$(STUDENT_ID) --region $(MY_AWS_REGION)
 
 create-ecs-cluster:
 	. ./scripts/assume-role.sh \
-		--role-name $(ECS_ROLE_NAME) \
+		--role-name $(ECS_ADMIN_ROLE_NAME) \
 		--profile admin; \
 	if aws ecs describe-clusters \
 	      --clusters $(ECS_CLUSTER) \
@@ -161,16 +193,6 @@ create-ecs-cluster:
 	    --region $(MY_AWS_REGION); \
 	  echo "✅ Cluster created."; \
 	fi
-
-test:
-	. ./scripts/assume-role.sh \
-		--role-name $(ECS_ROLE_NAME) \
-		--profile admin; \
-	aws ecs describe-clusters \
-		--clusters $(ECS_CLUSTER) \
-		--region $(MY_AWS_REGION) \
-		--query "clusters[?status=='ACTIVE'].clusterName" \
-		--output text
 
 create-vpc:
 	. ./scripts/assume-role.sh \
@@ -197,9 +219,83 @@ crate-security-group:
 		--vpc-id $$VPC_ID --query 'GroupId' --output text); \
 	echo "$$SG_LAMBDA $$SG_ECS"
 
-create-security-role:
+create-security-rule:
 	. ./scripts/assume-role.sh \
 		--role-name $(VPC_ROLE_NAME) \
 		--profile admin; \
 	aws ec2 authorize-security-group-ingress --group-id $$SG_ECS \
 		--protocol tcp --port $(APP_PORT) --source-group $$SG_LAMBDA; \
+
+register-task-definition:
+	set -o allexport && source ./.env.participant && source ./.env && envsubst < .github/ecs/task-def.template.json > ./.github/ecs/task-def.json
+	. ./scripts/assume-role.sh \
+		--role-name $(ECS_ROLE_NAME) \
+		--profile participant; \
+	aws ecs register-task-definition \
+		--cli-input-json file://.github/ecs/task-def.json \
+		--query 'taskDefinition.taskDefinitionArn' \
+		--output text \
+		--region ${MY_AWS_REGION};
+
+push_aws_parameters:
+	. ./scripts/assume-role.sh \
+			--role-name $(PUSH_PARAMETER_ROLE_NAME) \
+			--profile admin; \
+	TMP_ENV=$$(mktemp); \
+	echo "VPC_ID=$$VPC_ID"       >> $$TMP_ENV; \
+	echo "SUBNET1_ID=$$SUBNET1_ID" >> $$TMP_ENV; \
+	echo "SUBNET2_ID=$$SUBNET2_ID" >> $$TMP_ENV; \
+	echo "SG_LAMBDA=$$SG_LAMBDA"   >> $$TMP_ENV; \
+	echo "SG_ECS=$$SG_ECS"         >> $$TMP_ENV; \
+	env AWS_ACCESS_KEY_ID=$$AWS_ACCESS_KEY_ID \
+	    AWS_SECRET_ACCESS_KEY=$$AWS_SECRET_ACCESS_KEY \
+	    AWS_SESSION_TOKEN=$$AWS_SESSION_TOKEN \
+	    ./scripts/push_aws_parameters.sh -f $$TMP_ENV --prefix /${PARAMETERS_PREFIX}; \
+	rm $$TMP_ENV; \
+
+get_aws_parameters:
+	. ./scripts/assume-role.sh \
+		--role-name $(GET_PARAMETER_ROLE_NAME) \
+		--profile participant; \
+	VARS=$$(aws ssm get-parameters-by-path \
+		--path "/${PARAMETERS_PREFIX}" \
+		--with-decryption \
+		--recursive \
+		--output json); \
+	output="{"; \
+	first=true; \
+	tmpfile=$$(mktemp); \
+	echo "$$VARS" | jq -c '.Parameters[]' > $$tmpfile; \
+	while read -r row; do \
+		name=$$(echo $$row | jq -r '.Name' | sed 's|.*/||'); \
+		value=$$(echo $$row | jq -r '.Value'); \
+		if [ "$$first" = true ]; then \
+			first=false; \
+		else \
+			output="$$output,"; \
+		fi; \
+		output="$$output\"$$name\":\"$$value\""; \
+	done < $$tmpfile; \
+	rm $$tmpfile; \
+	output="$$output}"; \
+	echo $$output
+
+create-ecs-service:
+	. ./scripts/assume-role.sh \
+		--role-name $(ECS_ROLE_NAME) \
+		--profile participant; \
+	aws ecs create-service \
+		--cluster $(ECS_CLUSTER) \
+		--region $(MY_AWS_REGION) \
+		--service-name $(ECS_SERVICE)-$(STUDENT_ID) \
+		--task-definition ${FAMILY_NAME}-$(STUDENT_ID) \
+		--desired-count 1 \
+		--launch-type FARGATE \
+		--network-configuration "awsvpcConfiguration={ \
+			subnets=[$$SUBNET1_ID,$$SUBNET2_ID], \
+			securityGroups=[$$SG_ECS], \
+			assignPublicIp=DISABLED \
+		}"; \
+	aws lambda update-function-configuration \
+		--function-name $(LIGHTHOUSE_FUNCTION_NAME) \
+		--vpc-config "SubnetIds=$$SUBNET1_ID,$$SUBNET2_ID,SecurityGroupIds=$$SG_LAMBDA"
