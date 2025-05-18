@@ -242,8 +242,16 @@ create-security-rule:
 	. ./scripts/assume-role.sh \
 		--role-name $(VPC_ROLE_NAME) \
 		--profile admin; \
-	aws ec2 authorize-security-group-ingress --group-id $$SG_ECS \
-		--protocol tcp --port $(APP_PORT) --source-group $$SG_LAMBDA; \
+	aws ec2 authorize-security-group-ingress \
+		--group-id $$SG_ECS \
+		--protocol tcp \
+		--port $(APP_PORT) \
+		--source-group $$SG_LAMBDA; \
+	aws ec2 authorize-security-group-ingress \
+		--group-id $SG_ECR_ID \
+		--protocol tcp \
+		--port 443 \
+		--source-group $SG_ECS_ID
 
 register-task-definition:
 	set -o allexport && source ./.env.participant && source ./.env && envsubst < .github/ecs/task-def.template.json > ./.github/ecs/task-def.json
