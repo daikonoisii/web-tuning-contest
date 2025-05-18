@@ -37,6 +37,15 @@ provider:
             - ecr:GetRepositoryPolicy
           Resource:
             - arn:aws:ecr:${env:MY_AWS_REGION}:${env:AWS_ACCOUNT_ID}:repository/serverless-lighthouse-flows-generator-dev
+        - Effect: Allow
+          Action:
+            - ec2:CreateNetworkInterface
+            - ec2:DescribeNetworkInterfaces
+            - ec2:DeleteNetworkInterface
+            - ec2:DescribeSecurityGroups
+            - ec2:DescribeSubnets
+            - ec2:DescribeVpcs
+          Resource: "*"
 
 
 functions:

@@ -103,6 +103,12 @@ init_mac:
 	  fi; \
 	fi; \
 	make --no-print-directory -s register-task-definition
+	@VARS=$$(make --no-print-directory -s get_aws_parameters); \
+	SG_ECS=$$(echo $$VARS | jq -r '.SG_ECS') \
+	SG_LAMBDA=$$(echo $$VARS | jq -r '.SG_LAMBDA') \
+	SUBNET1_ID=$$(echo $$VARS | jq -r '.SUBNET1_ID') \
+	SUBNET2_ID=$$(echo $$VARS | jq -r '.SUBNET2_ID') \
+	make --no-print-directory -s create-ecs-service
 	@echo "✅ finish"
 
 init_aws:
@@ -273,3 +279,23 @@ get_aws_parameters:
 	rm $$tmpfile; \
 	output="$$output}"; \
 	echo $$output
+
+create-ecs-service:
+	. ./scripts/assume-role.sh \
+		--role-name $(ECS_ROLE_NAME) \
+		--profile participant; \
+	aws ecs create-service \
+		--cluster $(ECS_CLUSTER) \
+		--region $(MY_AWS_REGION) \
+		--service-name $(ECS_SERVICE)-$(STUDENT_ID) \
+		--task-definition ${FAMILY_NAME}-$(STUDENT_ID) \
+		--desired-count 1 \
+		--launch-type FARGATE \
+		--network-configuration "awsvpcConfiguration={ \
+			subnets=[$$SUBNET1_ID,$$SUBNET2_ID], \
+			securityGroups=[$$SG_ECS], \
+			assignPublicIp=DISABLED \
+		}"; \
+	aws lambda update-function-configuration \
+		--function-name $(LIGHTHOUSE_FUNCTION_NAME) \
+		--vpc-config "SubnetIds=$$SUBNET1_ID,$$SUBNET2_ID,SecurityGroupIds=$$SG_LAMBDA"
