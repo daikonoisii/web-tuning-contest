@@ -94,7 +94,14 @@ init_mac:
 	git add ./.github/workflows/deploy.yml; \
 	git commit -m "feat: :sparkles: create github action branch $(STUDENT_ID)/main"; \
 	git push -u origin $(STUDENT_ID)/main
-	$(MAKE) create-ecr-repository
+	if ! RESPONSE=$$(make --no-print-directory -s create-ecr-repository 2>&1); then \
+	  if echo "$$RESPONSE" | grep -q 'RepositoryAlreadyExistsException'; then \
+	    echo "ECRリポジトリは既に存在しています。処理を継続します。"; \
+	  else \
+	    echo "$$RESPONSE"; \
+	    exit 1; \
+	  fi; \
+	fi; \
 	make --no-print-directory -s register-task-definition
 	@echo "✅ finish"
 
