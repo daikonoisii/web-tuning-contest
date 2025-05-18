@@ -132,7 +132,7 @@ init_admin:
 	SUBNET2_ID=$${VARS[2]}; \
 	VARS=($$( \
 		VPC_ID=$${VPC_ID} \
-		make --no-print-directory -s crate-security-group)); \
+		make --no-print-directory -s create-security-group)); \
 	SG_LAMBDA=$${VARS[0]}; \
 	SG_ECS=$${VARS[1]}; \
 	SG_ECR=$${VARS[2]}; \
@@ -214,7 +214,7 @@ create-vpc:
 				--availability-zone $(AZ2) --query 'Subnet.SubnetId' --output text); \
 	echo "$$VPC_ID $$SUBNET1_ID $$SUBNET2_ID"
 
-crate-security-group:
+create-security-group:
 	. ./scripts/assume-role.sh \
 		--role-name $(VPC_ROLE_NAME) \
 		--profile admin; \
