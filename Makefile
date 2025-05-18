@@ -227,7 +227,7 @@ register-task-definition:
 
 push_aws_parameters:
 	. ./scripts/assume-role.sh \
-			--role-name $(PARAMETER_ROLE_NAME) \
+			--role-name $(PUSH_PARAMETER_ROLE_NAME) \
 			--profile admin; \
 	TMP_ENV=$$(mktemp); \
 	echo "VPC_ID=$$VPC_ID"       >> $$TMP_ENV; \
@@ -240,3 +240,30 @@ push_aws_parameters:
 	    AWS_SESSION_TOKEN=$$AWS_SESSION_TOKEN \
 	    ./scripts/push_aws_parameters.sh -f $$TMP_ENV --prefix /${PARAMETERS_PREFIX}; \
 	rm $$TMP_ENV; \
+
+get_aws_parameters:
+	. ./scripts/assume-role.sh \
+		--role-name $(GET_PARAMETER_ROLE_NAME) \
+		--profile participant; \
+	VARS=$$(aws ssm get-parameters-by-path \
+		--path "/${PARAMETERS_PREFIX}" \
+		--with-decryption \
+		--recursive \
+		--output json); \
+	output="{"; \
+	first=true; \
+	tmpfile=$$(mktemp); \
+	echo "$$VARS" | jq -c '.Parameters[]' > $$tmpfile; \
+	while read -r row; do \
+		name=$$(echo $$row | jq -r '.Name' | sed 's|.*/||'); \
+		value=$$(echo $$row | jq -r '.Value'); \
+		if [ "$$first" = true ]; then \
+			first=false; \
+		else \
+			output="$$output,"; \
+		fi; \
+		output="$$output\"$$name\":\"$$value\""; \
+	done < $$tmpfile; \
+	rm $$tmpfile; \
+	output="$$output}"; \
+	echo $$output
