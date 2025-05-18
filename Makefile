@@ -135,6 +135,7 @@ init_admin:
 		make --no-print-directory -s crate-security-group)); \
 	SG_LAMBDA=$${VARS[0]}; \
 	SG_ECS=$${VARS[1]}; \
+	SG_ECR=$${VARS[2]}; \
 	SG_LAMBDA=$$SG_LAMBDA \
 	SG_ECS=$$SG_ECS \
 	make --no-print-directory -s create-security-rule; \
@@ -218,12 +219,24 @@ crate-security-group:
 		--role-name $(VPC_ROLE_NAME) \
 		--profile admin; \
 	SG_LAMBDA=$$(aws ec2 create-security-group \
-		--group-name $(SG_LAMBDA_NAME) --description "Lambda outbound to ECS only" \
-		--vpc-id $$VPC_ID --query 'GroupId' --output text); \
+		--group-name $(SG_LAMBDA_NAME) \
+		--description "Lambda outbound to ECS only" \
+		--vpc-id $$VPC_ID \
+		--query 'GroupId' \
+		--output text); \
 	SG_ECS=$$(aws ec2 create-security-group \
-		--group-name $(SG_ECS_NAME) --description "ECS inbound from Lambda" \
-		--vpc-id $$VPC_ID --query 'GroupId' --output text); \
-	echo "$$SG_LAMBDA $$SG_ECS"
+		--group-name $(SG_ECS_NAME) \
+		--description "ECS inbound from Lambda" \
+		--vpc-id $$VPC_ID \
+		--query 'GroupId' \
+		--output text); \
+	SG_ECR_ID=$$(aws ec2 create-security-group \
+		--group-name $(SG_ECR_NAME) \
+		--description "ECR VPC endpoint SG" \
+		--vpc-id $$VPC_ID \
+		--query 'GroupId' \
+		--output text); \
+	echo "$$SG_LAMBDA $$SG_ECS $$SG_ECR_ID"
 
 create-security-rule:
 	. ./scripts/assume-role.sh \
