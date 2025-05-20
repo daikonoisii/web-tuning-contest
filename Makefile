@@ -206,8 +206,10 @@ create-vpc:
 		--output text); \
 	aws ec2 modify-vpc-attribute \
 		--vpc-id $$VPC_ID \
-		--enable-dns-support '{\"Value\": true}' \
-		--enable-dns-hostnames "{\"Value\":true}"; \
+		--enable-dns-support '{"Value": true}'; \
+	aws ec2 modify-vpc-attribute \
+		--vpc-id $$VPC_ID \
+		--enable-dns-hostnames '{"Value":true}'; \
 	SUBNET1_ID=$$(aws ec2 create-subnet --vpc-id $$VPC_ID --cidr-block $(SUBNET1_CIDR) \
 				--availability-zone $(AZ1) --query 'Subnet.SubnetId' --output text); \
 	SUBNET2_ID=$$(aws ec2 create-subnet --vpc-id $$VPC_ID --cidr-block $(SUBNET2_CIDR) \
