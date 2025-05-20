@@ -138,7 +138,21 @@ init_admin:
 	SG_ECR=$${VARS[2]}; \
 	SG_LAMBDA=$$SG_LAMBDA \
 	SG_ECS=$$SG_ECS \
+	SG_ECR_ID=$$SG_ECR \
 	make --no-print-directory -s create-security-rule; \
+	if ! RESPONSE=$$( \
+		VPC_ID=$$VPC_ID \
+		SUBNET1_ID=$$SUBNET1_ID \
+		SUBNET2_ID=$$SUBNET2_ID \
+		SG_ECR_ID=$$SG_ECR \
+		make --no-print-directory -s create-endpoint 2>&1); then \
+		if echo "$$RESPONSE" | grep -q 'AlreadyExists'; then \
+	    	echo "エンドポイントは既に存在しています。処理を継続します。"; \
+		else \
+	    	echo "$$RESPONSE"; \
+	    	exit 1; \
+		fi; \
+	fi; \
 	VPC_ID=$$VPC_ID \
 	SUBNET1_ID=$$SUBNET1_ID \
 	SUBNET2_ID=$$SUBNET2_ID \
@@ -250,10 +264,10 @@ create-security-rule:
 		--port $(APP_PORT) \
 		--source-group $$SG_LAMBDA; \
 	aws ec2 authorize-security-group-ingress \
-		--group-id $SG_ECR_ID \
+		--group-id $$SG_ECR_ID \
 		--protocol tcp \
 		--port 443 \
-		--source-group $SG_ECS_ID
+		--source-group $$SG_ECS
 
 register-task-definition:
 	set -o allexport && source ./.env.participant && source ./.env && envsubst < .github/ecs/task-def.template.json > ./.github/ecs/task-def.json
@@ -328,3 +342,32 @@ create-ecs-service:
 	aws lambda update-function-configuration \
 		--function-name $(LIGHTHOUSE_FUNCTION_NAME) \
 		--vpc-config "SubnetIds=$$SUBNET1_ID,$$SUBNET2_ID,SecurityGroupIds=$$SG_LAMBDA"
+
+create-endpoint:
+	. ./scripts/assume-role.sh \
+		--role-name $(VPC_ENDPOINT_ROLE_NAME) \
+		--profile admin; \
+	aws ec2 create-vpc-endpoint \
+		--vpc-id $$VPC_ID \
+		--vpc-endpoint-type Interface \
+		--service-name com.amazonaws.ap-northeast-1.ecr.api \
+		--subnet-ids $$SUBNET1_ID $$SUBNET2_ID \
+		--security-group-ids $$SG_ECR_ID \
+		--private-dns-enabled; \
+  	aws ec2 create-vpc-endpoint \
+		--vpc-id $$VPC_ID \
+		--vpc-endpoint-type Interface \
+		--service-name com.amazonaws.ap-northeast-1.ecr.dkr \
+		--subnet-ids $$SUBNET1_ID $$SUBNET2_ID \
+		--security-group-ids $$SG_ECR_ID \
+		--private-dns-enabled; \
+  	RTB_IDS=$$(aws ec2 describe-route-tables \
+  		--filters \
+    	"Name=vpc-id,Values=$$VPC_ID" \
+    	"Name=association.subnet-id,Values=$$SUBNET1_ID,$$SUBNET2_ID" \
+  		--query 'RouteTables[].RouteTableId' --output text); \
+	aws ec2 create-vpc-endpoint \
+		--vpc-id $$VPC_ID \
+		--vpc-endpoint-type Gateway \
+		--service-name com.amazonaws.$(MY_AWS_REGION).s3 \
+		--route-table-ids $$RTB_IDS; \
