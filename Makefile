@@ -350,14 +350,14 @@ create-endpoint:
 	aws ec2 create-vpc-endpoint \
 		--vpc-id $$VPC_ID \
 		--vpc-endpoint-type Interface \
-		--service-name com.amazonaws.ap-northeast-1.ecr.api \
+		--service-name com.amazonaws.$(MY_AWS_REGION).ecr.api \
 		--subnet-ids $$SUBNET1_ID $$SUBNET2_ID \
 		--security-group-ids $$SG_ECR_ID \
 		--private-dns-enabled; \
   	aws ec2 create-vpc-endpoint \
 		--vpc-id $$VPC_ID \
 		--vpc-endpoint-type Interface \
-		--service-name com.amazonaws.ap-northeast-1.ecr.dkr \
+		--service-name com.amazonaws.$(MY_AWS_REGION).ecr.dkr \
 		--subnet-ids $$SUBNET1_ID $$SUBNET2_ID \
 		--security-group-ids $$SG_ECR_ID \
 		--private-dns-enabled; \
