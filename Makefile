@@ -132,12 +132,27 @@ init_admin:
 	SUBNET2_ID=$${VARS[2]}; \
 	VARS=($$( \
 		VPC_ID=$${VPC_ID} \
-		make --no-print-directory -s crate-security-group)); \
+		make --no-print-directory -s create-security-group)); \
 	SG_LAMBDA=$${VARS[0]}; \
 	SG_ECS=$${VARS[1]}; \
+	SG_ECR=$${VARS[2]}; \
 	SG_LAMBDA=$$SG_LAMBDA \
 	SG_ECS=$$SG_ECS \
+	SG_ECR_ID=$$SG_ECR \
 	make --no-print-directory -s create-security-rule; \
+	if ! RESPONSE=$$( \
+		VPC_ID=$$VPC_ID \
+		SUBNET1_ID=$$SUBNET1_ID \
+		SUBNET2_ID=$$SUBNET2_ID \
+		SG_ECR_ID=$$SG_ECR \
+		make --no-print-directory -s create-endpoint 2>&1); then \
+		if echo "$$RESPONSE" | grep -q 'AlreadyExists'; then \
+	    	echo "エンドポイントは既に存在しています。処理を継続します。"; \
+		else \
+	    	echo "$$RESPONSE"; \
+	    	exit 1; \
+		fi; \
+	fi; \
 	VPC_ID=$$VPC_ID \
 	SUBNET1_ID=$$SUBNET1_ID \
 	SUBNET2_ID=$$SUBNET2_ID \
@@ -198,33 +213,61 @@ create-vpc:
 	. ./scripts/assume-role.sh \
 			--role-name $(VPC_ROLE_NAME) \
 			--profile admin; \
-	VPC_ID=$$(aws ec2 create-vpc --cidr-block $(VPC_CIDR) \
-			--region $(MY_AWS_REGION) --query 'Vpc.VpcId' --output text); \
-	aws ec2 modify-vpc-attribute --vpc-id $$VPC_ID --enable-dns-hostnames "{\"Value\":true}"; \
+	VPC_ID=$$(aws ec2 create-vpc \
+		--cidr-block $(VPC_CIDR) \
+		--region $(MY_AWS_REGION) \
+		--query 'Vpc.VpcId' \
+		--output text); \
+	aws ec2 modify-vpc-attribute \
+		--vpc-id $$VPC_ID \
+		--enable-dns-support '{"Value": true}'; \
+	aws ec2 modify-vpc-attribute \
+		--vpc-id $$VPC_ID \
+		--enable-dns-hostnames '{"Value":true}'; \
 	SUBNET1_ID=$$(aws ec2 create-subnet --vpc-id $$VPC_ID --cidr-block $(SUBNET1_CIDR) \
 				--availability-zone $(AZ1) --query 'Subnet.SubnetId' --output text); \
 	SUBNET2_ID=$$(aws ec2 create-subnet --vpc-id $$VPC_ID --cidr-block $(SUBNET2_CIDR) \
 				--availability-zone $(AZ2) --query 'Subnet.SubnetId' --output text); \
 	echo "$$VPC_ID $$SUBNET1_ID $$SUBNET2_ID"
 
-crate-security-group:
+create-security-group:
 	. ./scripts/assume-role.sh \
 		--role-name $(VPC_ROLE_NAME) \
 		--profile admin; \
 	SG_LAMBDA=$$(aws ec2 create-security-group \
-		--group-name $(SG_LAMBDA_NAME) --description "Lambda outbound to ECS only" \
-		--vpc-id $$VPC_ID --query 'GroupId' --output text); \
+		--group-name $(SG_LAMBDA_NAME) \
+		--description "Lambda outbound to ECS only" \
+		--vpc-id $$VPC_ID \
+		--query 'GroupId' \
+		--output text); \
 	SG_ECS=$$(aws ec2 create-security-group \
-		--group-name $(SG_ECS_NAME) --description "ECS inbound from Lambda" \
-		--vpc-id $$VPC_ID --query 'GroupId' --output text); \
-	echo "$$SG_LAMBDA $$SG_ECS"
+		--group-name $(SG_ECS_NAME) \
+		--description "ECS inbound from Lambda" \
+		--vpc-id $$VPC_ID \
+		--query 'GroupId' \
+		--output text); \
+	SG_ECR_ID=$$(aws ec2 create-security-group \
+		--group-name $(SG_ECR_NAME) \
+		--description "ECR VPC endpoint SG" \
+		--vpc-id $$VPC_ID \
+		--query 'GroupId' \
+		--output text); \
+	echo "$$SG_LAMBDA $$SG_ECS $$SG_ECR_ID"
 
 create-security-rule:
 	. ./scripts/assume-role.sh \
 		--role-name $(VPC_ROLE_NAME) \
 		--profile admin; \
-	aws ec2 authorize-security-group-ingress --group-id $$SG_ECS \
-		--protocol tcp --port $(APP_PORT) --source-group $$SG_LAMBDA; \
+	aws ec2 authorize-security-group-ingress \
+		--group-id $$SG_ECS \
+		--protocol tcp \
+		--port $(APP_PORT) \
+		--source-group $$SG_LAMBDA; \
+	aws ec2 authorize-security-group-ingress \
+		--group-id $$SG_ECR_ID \
+		--protocol tcp \
+		--port 443 \
+		--source-group $$SG_ECS
 
 register-task-definition:
 	set -o allexport && source ./.env.participant && source ./.env && envsubst < .github/ecs/task-def.template.json > ./.github/ecs/task-def.json
@@ -299,3 +342,32 @@ create-ecs-service:
 	aws lambda update-function-configuration \
 		--function-name $(LIGHTHOUSE_FUNCTION_NAME) \
 		--vpc-config "SubnetIds=$$SUBNET1_ID,$$SUBNET2_ID,SecurityGroupIds=$$SG_LAMBDA"
+
+create-endpoint:
+	. ./scripts/assume-role.sh \
+		--role-name $(VPC_ENDPOINT_ROLE_NAME) \
+		--profile admin; \
+	aws ec2 create-vpc-endpoint \
+		--vpc-id $$VPC_ID \
+		--vpc-endpoint-type Interface \
+		--service-name com.amazonaws.ap-northeast-1.ecr.api \
+		--subnet-ids $$SUBNET1_ID $$SUBNET2_ID \
+		--security-group-ids $$SG_ECR_ID \
+		--private-dns-enabled; \
+  	aws ec2 create-vpc-endpoint \
+		--vpc-id $$VPC_ID \
+		--vpc-endpoint-type Interface \
+		--service-name com.amazonaws.ap-northeast-1.ecr.dkr \
+		--subnet-ids $$SUBNET1_ID $$SUBNET2_ID \
+		--security-group-ids $$SG_ECR_ID \
+		--private-dns-enabled; \
+  	RTB_IDS=$$(aws ec2 describe-route-tables \
+  		--filters \
+    	"Name=vpc-id,Values=$$VPC_ID" \
+    	"Name=association.main,Values=true" \
+  		--query 'RouteTables[].RouteTableId' --output text); \
+	aws ec2 create-vpc-endpoint \
+		--vpc-id $$VPC_ID \
+		--vpc-endpoint-type Gateway \
+		--service-name com.amazonaws.$(MY_AWS_REGION).s3 \
+		--route-table-ids $$RTB_IDS; \

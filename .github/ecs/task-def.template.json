@@ -4,7 +4,7 @@
     "containerDefinitions": [
       {
         "name": "${CONTAINER_NAME}",
-        "image": "public.ecr.aws/${ECR_REPOSITORY}-${STUDENT_ID}",
+        "image": "${AWS_ACCOUNT_ID}.dkr.ecr.${MY_AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}-${STUDENT_ID}:latest",
         "memory": 512,
         "cpu": 256,
         "essential": true,
