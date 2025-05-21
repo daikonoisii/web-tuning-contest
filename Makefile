@@ -364,7 +364,7 @@ create-endpoint:
   	RTB_IDS=$$(aws ec2 describe-route-tables \
   		--filters \
     	"Name=vpc-id,Values=$$VPC_ID" \
-    	"Name=association.subnet-id,Values=$$SUBNET1_ID,$$SUBNET2_ID" \
+    	"Name=association.main,Values=true" \
   		--query 'RouteTables[].RouteTableId' --output text); \
 	aws ec2 create-vpc-endpoint \
 		--vpc-id $$VPC_ID \
