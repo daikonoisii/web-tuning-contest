@@ -3,6 +3,7 @@ SHELL := /bin/bash
 ifneq ($(filter create-ecr-repository \
 				create-ecs-service \
 				init_mac \
+				create-logs-group \
 				register-task-definition,$(MAKECMDGOALS)),)
   # create-ecr-repositoryならparticipant 用を読み込む
   -include .env.participant
@@ -102,6 +103,7 @@ init_mac:
 	    exit 1; \
 	  fi; \
 	fi; \
+	make --no-print-directory -s  create-logs-group
 	make --no-print-directory -s register-task-definition
 	@VARS=$$(make --no-print-directory -s get_aws_parameters); \
 	SG_ECS=$$(echo $$VARS | jq -r '.SG_ECS') \
@@ -350,14 +352,14 @@ create-endpoint:
 	aws ec2 create-vpc-endpoint \
 		--vpc-id $$VPC_ID \
 		--vpc-endpoint-type Interface \
-		--service-name com.amazonaws.ap-northeast-1.ecr.api \
+		--service-name com.amazonaws.$(MY_AWS_REGION).ecr.api \
 		--subnet-ids $$SUBNET1_ID $$SUBNET2_ID \
 		--security-group-ids $$SG_ECR_ID \
 		--private-dns-enabled; \
   	aws ec2 create-vpc-endpoint \
 		--vpc-id $$VPC_ID \
 		--vpc-endpoint-type Interface \
-		--service-name com.amazonaws.ap-northeast-1.ecr.dkr \
+		--service-name com.amazonaws.$(MY_AWS_REGION).ecr.dkr \
 		--subnet-ids $$SUBNET1_ID $$SUBNET2_ID \
 		--security-group-ids $$SG_ECR_ID \
 		--private-dns-enabled; \
@@ -371,3 +373,19 @@ create-endpoint:
 		--vpc-endpoint-type Gateway \
 		--service-name com.amazonaws.$(MY_AWS_REGION).s3 \
 		--route-table-ids $$RTB_IDS; \
+	aws ec2 create-vpc-endpoint \
+		--vpc-id $$VPC_ID \
+		--vpc-endpoint-type Interface \
+		--service-name com.amazonaws.${MY_AWS_REGION}.logs \
+		--subnet-ids $$SUBNET1_ID $$SUBNET2_ID \
+		--security-group-ids $$SG_ECR_ID \
+		--private-dns-enabled
+
+create-logs-group:
+	echo "✅$(LOGS_GROUP_ROLE_NAME)"
+	. ./scripts/assume-role.sh \
+			--role-name $(LOGS_GROUP_ROLE_NAME) \
+			--profile participant; \
+	aws logs create-log-group \
+		--log-group-name "/ecs/work-space-${STUDENT_ID}" \
+		--region "${MY_AWS_REGION}"
