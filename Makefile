@@ -110,6 +110,7 @@ init_mac:
 	SG_LAMBDA=$$(echo $$VARS | jq -r '.SG_LAMBDA') \
 	SUBNET1_ID=$$(echo $$VARS | jq -r '.SUBNET1_ID') \
 	SUBNET2_ID=$$(echo $$VARS | jq -r '.SUBNET2_ID') \
+	SD_SERVICE_ARN=$$(echo $$VARS | jq -r '.SD_SERVICE_ARN') \
 	make --no-print-directory -s create-ecs-service
 	@echo "✅ finish"
 
@@ -156,10 +157,14 @@ init_admin:
 		fi; \
 	fi; \
 	VPC_ID=$$VPC_ID \
+	make --no-print-directory -s create-sd-namespace; \
+	SD_SERVICE_ARN=($$(make --no-print-directory -s register-sd-service)); \
+	VPC_ID=$$VPC_ID \
 	SUBNET1_ID=$$SUBNET1_ID \
 	SUBNET2_ID=$$SUBNET2_ID \
 	SG_LAMBDA=$$SG_LAMBDA \
 	SG_ECS=$$SG_ECS \
+	SD_SERVICE_ARN=$$SD_SERVICE_ARN \
 	make --no-print-directory -s push_aws_parameters; \
 	$(MAKE) create-ecs-cluster
 
@@ -287,11 +292,12 @@ push_aws_parameters:
 			--role-name $(PUSH_PARAMETER_ROLE_NAME) \
 			--profile admin; \
 	TMP_ENV=$$(mktemp); \
-	echo "VPC_ID=$$VPC_ID"       >> $$TMP_ENV; \
-	echo "SUBNET1_ID=$$SUBNET1_ID" >> $$TMP_ENV; \
-	echo "SUBNET2_ID=$$SUBNET2_ID" >> $$TMP_ENV; \
-	echo "SG_LAMBDA=$$SG_LAMBDA"   >> $$TMP_ENV; \
-	echo "SG_ECS=$$SG_ECS"         >> $$TMP_ENV; \
+	echo "VPC_ID=$$VPC_ID"                 >> $$TMP_ENV; \
+	echo "SUBNET1_ID=$$SUBNET1_ID"         >> $$TMP_ENV; \
+	echo "SUBNET2_ID=$$SUBNET2_ID"         >> $$TMP_ENV; \
+	echo "SG_LAMBDA=$$SG_LAMBDA"           >> $$TMP_ENV; \
+	echo "SG_ECS=$$SG_ECS"         		   >> $$TMP_ENV; \
+	echo "SD_SERVICE_ARN=$$SD_SERVICE_ARN" >> $$TMP_ENV; \
 	env AWS_ACCESS_KEY_ID=$$AWS_ACCESS_KEY_ID \
 	    AWS_SECRET_ACCESS_KEY=$$AWS_SECRET_ACCESS_KEY \
 	    AWS_SESSION_TOKEN=$$AWS_SESSION_TOKEN \
@@ -336,6 +342,7 @@ create-ecs-service:
 		--task-definition ${FAMILY_NAME}-$(STUDENT_ID) \
 		--desired-count 1 \
 		--launch-type FARGATE \
+		--service-registries registryArn=$$SD_SERVICE_ARN \
 		--network-configuration "awsvpcConfiguration={ \
 			subnets=[$$SUBNET1_ID,$$SUBNET2_ID], \
 			securityGroups=[$$SG_ECS], \
@@ -389,3 +396,38 @@ create-logs-group:
 	aws logs create-log-group \
 		--log-group-name "/ecs/work-space-${STUDENT_ID}" \
 		--region "${MY_AWS_REGION}"
+
+create-sd-namespace:
+	. ./scripts/assume-role.sh \
+		--role-name $(CLOUDMAP_ROLE_NAME) \
+		--profile admin; \
+	OP_ID=$$(aws servicediscovery create-private-dns-namespace \
+		--name "$(SD_NAMESPACE)" \
+		--vpc "$$VPC_ID" \
+		--description "Service Discovery namespace for Lighthouse targets" \
+		--creator-request-id "$$(date +%s)" \
+		--query "OperationId" \
+		--output text); \
+	echo "✅ Namespace creation kicked off, OperationId=$$OP_ID"; \
+	STATUS=""; \
+	until [ "$$STATUS" = "SUCCESS" ]; do \
+		echo "⏳ Waiting for namespace to be ACTIVE (current: $$STATUS)…"; \
+		sleep 2; \
+		STATUS=$$(aws servicediscovery get-operation --operation-id $$OP_ID \
+			--query "Operation.Status" --output text); \
+	done; \
+	echo "✅ Namespace is now ACTIVE!"
+
+register-sd-service:
+	. ./scripts/assume-role.sh \
+		--role-name $(CLOUDMAP_ROLE_NAME) \
+		--profile admin; \
+	NAMESPACE_ID=$$(aws servicediscovery list-namespaces \
+	    --filters "Name=TYPE,Values=DNS_PRIVATE" "Name=NAME,Values=$(SD_NAMESPACE)" \
+	    --query "Namespaces[0].Id" --output text); \
+	aws servicediscovery create-service \
+		--name "$(ECS_SERVICE)-$(STUDENT_ID)" \
+		--namespace-id $$NAMESPACE_ID \
+		--description "Service Discovery for $(ECS_SERVICE)-$(STUDENT_ID)" \
+		--dns-config "NamespaceId=$$NAMESPACE_ID,RoutingPolicy=MULTIVALUE,DnsRecords=[{Type=A,TTL=60}]" \
+		--query "Service.Arn" --output text \
