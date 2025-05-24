@@ -60,6 +60,7 @@ jobs:
         with:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ secrets.IAM_ROLE_NAME }}
           aws-region: ${{ env.MY_AWS_REGION }}
+          output-credentials: true
 
       # ECR にログイン
       - name: Login to Amazon ECR
@@ -114,9 +115,9 @@ jobs:
         id: invoke-lambda
         uses: gagoar/invoke-aws-lambda@v3
         with:
-          AWS_ACCESS_KEY_ID: ${{ steps.awscreds.outputs.aws-access-key-id }}
-          AWS_SECRET_ACCESS_KEY: ${{ steps.awscreds.outputs.aws-secret-access-key }}
-          AWS_SESSION_TOKEN: ${{ steps.awscreds.outputs.aws-session-token }}
+          AWS_ACCESS_KEY_ID: ${{ steps.awscreds.outputs['aws-access-key-id'] }}
+          AWS_SECRET_ACCESS_KEY: ${{ steps.awscreds.outputs['aws-secret-access-key'] }}
+          AWS_SESSION_TOKEN: ${{ steps.awscreds.outputs['aws-session-token'] }}
           Region: ${{ env.MY_AWS_REGION }}
           FunctionName: ${{ secrets.LIGHTHOUSE_FUNCTION_NAME }}
           Payload: ${{ steps.build-payload.outputs.payload }}
