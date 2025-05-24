@@ -56,7 +56,7 @@ jobs:
       # AWS の認証情報を設定
       - name: Configure AWS credentials
         id: awscreds
-        uses: aws-actions/configure-aws-credentials@v2
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ secrets.IAM_ROLE_NAME }}
           aws-region: ${{ env.MY_AWS_REGION }}
