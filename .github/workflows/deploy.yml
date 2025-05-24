@@ -55,6 +55,7 @@ jobs:
 
       # AWS の認証情報を設定
       - name: Configure AWS credentials
+        id: awscreds
         uses: aws-actions/configure-aws-credentials@v2
         with:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ secrets.IAM_ROLE_NAME }}
@@ -113,11 +114,14 @@ jobs:
         id: invoke-lambda
         uses: gagoar/invoke-aws-lambda@v3
         with:
+          AWS_ACCESS_KEY_ID: ${{ steps.awscreds.outputs.aws-access-key-id }}
+          AWS_SECRET_ACCESS_KEY: ${{ steps.awscreds.outputs.aws-secret-access-key }}
+          AWS_SESSION_TOKEN: ${{ steps.awscreds.outputs.aws-session-token }}
           Region: ${{ env.MY_AWS_REGION }}
           FunctionName: ${{ secrets.LIGHTHOUSE_FUNCTION_NAME }}
           Payload: ${{ steps.build-payload.outputs.payload }}
           HTTP_TIMEOUT: 660000
-          LogType:   RequestResponse 
+          LogType: RequestResponse
 
       # レスポンスをログ表示
       - name: Show response
