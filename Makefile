@@ -286,6 +286,7 @@ register-task-definition:
 		--query 'taskDefinition.taskDefinitionArn' \
 		--output text \
 		--region ${MY_AWS_REGION};
+	rm ./.github/ecs/task-def.json
 
 push_aws_parameters:
 	. ./scripts/assume-role.sh \
