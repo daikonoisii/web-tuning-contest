@@ -343,6 +343,7 @@ create-ecs-service:
 		--desired-count 1 \
 		--launch-type FARGATE \
 		--service-registries registryArn=$$SD_SERVICE_ARN \
+		--deployment-configuration "minimumHealthyPercent=0,maximumPercent=100" \
 		--network-configuration "awsvpcConfiguration={ \
 			subnets=[$$SUBNET1_ID,$$SUBNET2_ID], \
 			securityGroups=[$$SG_ECS], \
