@@ -23,6 +23,8 @@ env:
   CONTAINER_NAME: ${{ secrets.CONTAINER_NAME }}
   ECS_CLUSTER: ${{ secrets.ECS_CLUSTER }}
   ECS_SERVICE: ${{ secrets.ECS_SERVICE }}-${{ github.event.client_payload.STUDENT_ID }}
+  FQDN: ${{ secrets.ECS_SERVICE }}-${{ github.event.client_payload.STUDENT_ID }}.${{ secrets.SD_NAMESPACE }}
+  SD_NAMESPACE: ${{ secrets.SD_NAMESPACE }}
 jobs:
   # deploy job
   deploy:
@@ -89,3 +91,35 @@ jobs:
           cluster: ${{ env.ECS_CLUSTER }}
           service: ${{ env.ECS_SERVICE }}
           task-definition: ${{ steps.render-task-def.outputs.task-definition }}
+
+      # 計測対象のURLを作成
+      - name: Build payload.json
+        id: build-payload
+        run: |
+          IFS=',' read -ra paths <<< "${TARGET_PATHS}"
+          urls=()
+          for p in "${paths[@]}"; do
+            [[ "$p" != /* ]] && p="/$p"
+            urls+=("\"${FQDN}${p}\"")
+          done
+          printf '{\n  "urls": [%s],\n  "student_id": "%s"\n}\n' \
+                "$(IFS=,; echo "${urls[*]}")" \
+                "$STUDENT_ID" > payload.json
+          cat payload.json
+          echo "payload=$(jq -c . < payload.json)" >> "$GITHUB_OUTPUT"
+
+      # lighthouseを実行
+      - name: Invoke lighthouse lambda
+        id: invoke-lambda
+        uses: gagoar/invoke-aws-lambda@v3
+        with:
+          region: ${{ env.MY_AWS_REGION }}
+          function-name: ${{ env.LIGHTHOUSE_FUNCTION_NAME }}
+          payload: ${{ steps.build-payload.outputs.payload }}
+          timeout: 660
+
+      # レスポンスをログ表示
+      - name: Show response
+        run: |
+          echo "Lambda result:"
+          echo "${{ steps.invoke-lambda.outputs.body }}"

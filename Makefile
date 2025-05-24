@@ -38,7 +38,6 @@ push_lighthouse_lambda:
 			S3_BUCKET_NAME=$(S3_BUCKET_NAME) \
 			AWS_ACCOUNT_ID=$(AWS_ACCOUNT_ID) \
 			LIGHTHOUSE_FUNCTION_NAME=$(LIGHTHOUSE_FUNCTION_NAME) \
-			LIGHTHOUSE_FUNCTION_NAME=$(LIGHTHOUSE_FUNCTION_NAME) \
 			AWS_ACCESS_KEY_ID=$$AWS_ACCESS_KEY_ID \
 			AWS_SECRET_ACCESS_KEY=$$AWS_SECRET_ACCESS_KEY \
 			AWS_SESSION_TOKEN=$$AWS_SESSION_TOKEN"; \
@@ -344,6 +343,7 @@ create-ecs-service:
 		--desired-count 1 \
 		--launch-type FARGATE \
 		--service-registries registryArn=$$SD_SERVICE_ARN \
+		--deployment-configuration "minimumHealthyPercent=0,maximumPercent=100" \
 		--network-configuration "awsvpcConfiguration={ \
 			subnets=[$$SUBNET1_ID,$$SUBNET2_ID], \
 			securityGroups=[$$SG_ECS], \
