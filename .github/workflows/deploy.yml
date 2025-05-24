@@ -113,10 +113,11 @@ jobs:
         id: invoke-lambda
         uses: gagoar/invoke-aws-lambda@v3
         with:
-          region: ${{ env.MY_AWS_REGION }}
-          function-name: ${{ secrets.LIGHTHOUSE_FUNCTION_NAME }}
-          payload: ${{ steps.build-payload.outputs.payload }}
-          timeout: 660
+          Region: ${{ env.MY_AWS_REGION }}
+          FunctionName: ${{ secrets.LIGHTHOUSE_FUNCTION_NAME }}
+          Payload: ${{ steps.build-payload.outputs.payload }}
+          HTTP_TIMEOUT: 660000
+          LogType:   RequestResponse 
 
       # レスポンスをログ表示
       - name: Show response
