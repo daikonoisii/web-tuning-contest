@@ -134,7 +134,7 @@ jobs:
           FunctionName: ${{ secrets.LIGHTHOUSE_FUNCTION_NAME }}
           Payload: ${{ steps.build-payload.outputs.payload }}
           HTTP_TIMEOUT: 660000
-          LogType: RequestResponse
+          LogType: None
 
       # レスポンスをログ表示
       - name: Show response
