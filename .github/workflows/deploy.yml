@@ -108,7 +108,7 @@ jobs:
           urls=()
           for p in "${paths[@]}"; do
             [[ "$p" != /* ]] && p="/$p"
-            urls+=("\"${FQDN}${p}\"")
+            urls+=("\"https://${FQDN}${p}\"")
           done
           printf '{\n  "urls": [%s],\n  "student_id": "%s"\n}\n' \
                 "$(IFS=,; echo "${urls[*]}")" \
