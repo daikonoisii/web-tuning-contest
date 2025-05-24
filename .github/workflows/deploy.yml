@@ -62,6 +62,12 @@ jobs:
           aws-region: ${{ env.MY_AWS_REGION }}
           output-credentials: true
 
+      - name: DEBUG - dump awscreds outputs 1
+        run: |
+          echo "access = '${{ steps.awscreds.outputs.aws-access-key-id }}'"
+          echo "secret = '${{ steps.awscreds.outputs.aws-secret-access-key }}'"
+          echo "token  = '${{ steps.awscreds.outputs.aws-session-token }}'"
+
       # ECR にログイン
       - name: Login to Amazon ECR
         id: login-ecr
@@ -109,6 +115,12 @@ jobs:
                 "$STUDENT_ID" > payload.json
           cat payload.json
           echo "payload=$(jq -c . < payload.json)" >> "$GITHUB_OUTPUT"
+
+      - name: DEBUG - dump awscreds outputs 2
+        run: |
+          echo "access = '${{ steps.awscreds.outputs.aws-access-key-id }}'"
+          echo "secret = '${{ steps.awscreds.outputs.aws-secret-access-key }}'"
+          echo "token  = '${{ steps.awscreds.outputs.aws-session-token }}'"
 
       # lighthouseを実行
       - name: Invoke lighthouse lambda
