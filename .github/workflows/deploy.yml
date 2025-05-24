@@ -96,7 +96,7 @@ jobs:
       - name: Build payload.json
         id: build-payload
         run: |
-          IFS=',' read -ra paths <<< "${{ env.TARGET_PATHS }}"
+          IFS=',' read -ra paths <<< "${{ secrets.TARGET_PATHS }}"
           urls=()
           for p in "${paths[@]}"; do
             [[ "$p" != /* ]] && p="/$p"
