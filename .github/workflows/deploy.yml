@@ -114,7 +114,7 @@ jobs:
         uses: gagoar/invoke-aws-lambda@v3
         with:
           region: ${{ env.MY_AWS_REGION }}
-          function-name: ${{ env.LIGHTHOUSE_FUNCTION_NAME }}
+          function-name: ${{ secrets.LIGHTHOUSE_FUNCTION_NAME }}
           payload: ${{ steps.build-payload.outputs.payload }}
           timeout: 660
 
