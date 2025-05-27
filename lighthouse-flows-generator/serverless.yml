@@ -7,6 +7,9 @@ provider:
   region: ${env:MY_AWS_REGION}
   environment:
     S3_BUCKET_NAME: ${env:S3_BUCKET_NAME}
+    SLACK_BOT_TOKEN: ${env:SLACK_BOT_TOKEN}
+    SLACK_SIGNING_SECRET: ${env:SLACK_SIGNING_SECRET}
+    MAPPING_S3_KEY: ${env:MAPPING_S3_KEY}
   architecture: x86_64
   ecr:
     images:
@@ -30,6 +33,7 @@ provider:
         - Effect: Allow
           Action:
             - s3:PutObject
+            - s3:GetObject
           Resource:
             - arn:aws:s3:::${env:S3_BUCKET_NAME}/*
         - Effect: Allow
@@ -63,6 +67,8 @@ package:
   individually: true
   exclude:
     - src/**
+    - dist/sync_slack_mapping.d.ts
+    - dist/sync_slack_mapping.js
     - tsconfig.json
     - README.md
     - 計画書

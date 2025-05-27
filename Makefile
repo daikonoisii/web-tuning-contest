@@ -40,6 +40,9 @@ push_lighthouse_lambda:
 			LIGHTHOUSE_FUNCTION_NAME=$(LIGHTHOUSE_FUNCTION_NAME) \
 			AWS_ACCESS_KEY_ID=$$AWS_ACCESS_KEY_ID \
 			AWS_SECRET_ACCESS_KEY=$$AWS_SECRET_ACCESS_KEY \
+			SLACK_BOT_TOKEN=$(SLACK_BOT_TOKEN) \
+			SLACK_SIGNING_SECRET=$(SLACK_SIGNING_SECRET) \
+			MAPPING_S3_KEY=$(MAPPING_S3_KEY) \
 			AWS_SESSION_TOKEN=$$AWS_SESSION_TOKEN"; \
 		cd ./lighthouse-flows-generator; \
 		npm run build; \
@@ -166,6 +169,13 @@ init_admin:
 	SD_SERVICE_ARN=$$SD_SERVICE_ARN \
 	make --no-print-directory -s push_aws_parameters; \
 	$(MAKE) create-ecs-cluster
+	. ./scripts/assume-role.sh \
+		--role-name $(MAPPING_ROLE_NAME) \
+		--profile admin; \
+	AWS_ACCESS_KEY_ID=$$AWS_ACCESS_KEY_ID \
+	AWS_SECRET_ACCESS_KEY=$$AWS_SECRET_ACCESS_KEY \
+	AWS_SESSION_TOKEN=$$AWS_SESSION_TOKEN \
+	npx ts-node ./lighthouse-flows-generator/src/sync_slack_mapping.ts
 
 thumbprint:
 	@echo "→ $(OIDC_HOST) の証明書 thumbprint を取得中..." >&2
@@ -432,3 +442,12 @@ register-sd-service:
 		--description "Service Discovery for $(ECS_SERVICE)-$(STUDENT_ID)" \
 		--dns-config "NamespaceId=$$NAMESPACE_ID,RoutingPolicy=MULTIVALUE,DnsRecords=[{Type=A,TTL=60}]" \
 		--query "Service.Arn" --output text \
+
+test:
+	. ./scripts/assume-role.sh \
+	--role-name $(MAPPING_ROLE_NAME) \
+	--profile admin; \
+	AWS_ACCESS_KEY_ID=$$AWS_ACCESS_KEY_ID \
+	AWS_SECRET_ACCESS_KEY=$$AWS_SECRET_ACCESS_KEY \
+	AWS_SESSION_TOKEN=$$AWS_SESSION_TOKEN \
+	npx ts-node ./lighthouse-flows-generator/src/sync_slack_mapping.ts

@@ -1,9 +1,67 @@
 import puppeteer, { type LaunchOptions, type Browser } from "puppeteer";
 import { S3 } from "aws-sdk";
+import { App } from '@slack/bolt';
 import fs from 'node:fs';
 import type { APIGatewayProxyEvent, Context } from "aws-lambda";
 // @ts-ignore
 import { startFlow } from "lighthouse/lighthouse-core/fraggle-rock/api.js";
+
+async function sendSlackReport(
+  s3: S3,
+  bucketName: string,
+  mappingKey: string,
+  studentId: string,
+  reportHtml: string,
+  reportName: string
+): Promise<void> {
+  // マッピングファイルを S3 から取得
+  const mappingData = await s3
+    .getObject({ Bucket: bucketName, Key: mappingKey })
+    .promise();
+
+  if (!mappingData.Body) {
+    console.error(`Failed to load mapping file: ${mappingKey}`);
+    return;
+  }
+
+  const mappingJson = JSON.parse(
+    mappingData.Body.toString("utf-8")
+  ) as Record<string, string>;
+
+  // studentId に紐づく Slack ID を取得
+  const slackIds = Object.entries(mappingJson)
+    .filter(([, sid]) => sid === studentId)
+    .map(([slackId]) => slackId);
+
+  if (slackIds.length === 0) {
+    console.warn(`No Slack ID found for studentId=${studentId}`);
+    return;
+  }
+
+  // Bolt アプリ初期化
+  const slackApp = new App({
+    token: process.env.SLACK_BOT_TOKEN,
+    signingSecret: process.env.SLACK_SIGNING_SECRET,
+  });
+
+  for (const slackId of slackIds) {
+    const conv = await slackApp.client.conversations.open({ users: slackId });
+    const dmChannelId = conv.channel?.id;
+    if (!dmChannelId) {
+      console.error(`Cannot open DM channel for user ${slackId}`);
+      continue;
+    }
+
+    await slackApp.client.files.uploadV2({
+      file: Buffer.from(reportHtml, 'utf-8'),
+      filename: `${reportName}.html`,
+      initial_comment: `フローレポート${reportName}.html`,
+      channels: dmChannelId,
+    });
+
+    console.log(`Uploaded HTML report to Slack ID ${slackId}`);(`Uploaded HTML report to Slack ID ${slackId}`);
+  }
+}
 
 export const handler = async (
   event: APIGatewayProxyEvent,
@@ -116,6 +174,20 @@ export const handler = async (
     Body: report,
     ContentType: "text/html",
   }).promise();
+
+  const mappingKey = process.env.MAPPING_S3_KEY;
+  if (!mappingKey) {
+    console.error("MAPPING_S3_KEY is not defined in env");
+  } else {
+    await sendSlackReport(
+      s3,
+      bucketName,
+      mappingKey,
+      studentId,
+      report,
+      name
+    );
+  }
 
   return {
     statusCode: 200,
