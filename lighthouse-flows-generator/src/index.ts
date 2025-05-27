@@ -1,3 +1,3 @@
-import { handler as generateHandler } from './commands/generate';
+import { handler as generateHandler } from './handlers/lighthouse';
 
 export const handler = generateHandler;
