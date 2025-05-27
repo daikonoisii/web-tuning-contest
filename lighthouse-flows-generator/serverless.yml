@@ -63,6 +63,8 @@ package:
   individually: true
   exclude:
     - src/**
+    - dist/sync_slack_mapping.d.ts
+    - dist/sync_slack_mapping.js
     - tsconfig.json
     - README.md
     - 計画書

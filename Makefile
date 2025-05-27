@@ -166,6 +166,13 @@ init_admin:
 	SD_SERVICE_ARN=$$SD_SERVICE_ARN \
 	make --no-print-directory -s push_aws_parameters; \
 	$(MAKE) create-ecs-cluster
+	. ./scripts/assume-role.sh \
+		--role-name $(MAPPING_ROLE_NAME) \
+		--profile admin; \
+	AWS_ACCESS_KEY_ID=$$AWS_ACCESS_KEY_ID \
+	AWS_SECRET_ACCESS_KEY=$$AWS_SECRET_ACCESS_KEY \
+	AWS_SESSION_TOKEN=$$AWS_SESSION_TOKEN \
+	npx ts-node ./lighthouse-flows-generator/src/sync_slack_mapping.ts
 
 thumbprint:
 	@echo "→ $(OIDC_HOST) の証明書 thumbprint を取得中..." >&2
