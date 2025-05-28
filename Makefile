@@ -107,12 +107,13 @@ init_mac:
 	fi; \
 	make --no-print-directory -s  create-logs-group
 	make --no-print-directory -s register-task-definition
-	@VARS=$$(make --no-print-directory -s get_aws_parameters); \
+	SD_SERVICE_ARN=($$(make --no-print-directory -s register-sd-service)); \
+	VARS=$$(make --no-print-directory -s get_aws_parameters); \
 	SG_ECS=$$(echo $$VARS | jq -r '.SG_ECS') \
 	SG_LAMBDA=$$(echo $$VARS | jq -r '.SG_LAMBDA') \
 	SUBNET1_ID=$$(echo $$VARS | jq -r '.SUBNET1_ID') \
 	SUBNET2_ID=$$(echo $$VARS | jq -r '.SUBNET2_ID') \
-	SD_SERVICE_ARN=$$(echo $$VARS | jq -r '.SD_SERVICE_ARN') \
+	SD_SERVICE_ARN=$$SD_SERVICE_ARN \
 	make --no-print-directory -s create-ecs-service
 	@echo "✅ finish"
 
@@ -121,8 +122,6 @@ init_aws:
 
 init_admin:
 	brew install gh
-	./scripts/sync_github_secrets.sh -r ${LIGHTHOUSE_ORG}/${LIGHTHOUSE_REPOSITORY_NAME} -f ./.env.github.secrets.lighthouse
-	./scripts/sync_github_secrets.sh -r ${WORK_SPACE_ORG}/${WORK_SPACE_REPOSITORY_NAME} -f ./.env.github.secrets.work_space
 	if ! RESPONSE=$$(make --no-print-directory -s create-oidc-provider 2>&1); then \
 	  if echo "$$RESPONSE" | grep -q 'EntityAlreadyExists'; then \
 	    echo "OIDCプロバイダーは既に存在しています。処理を継続します。"; \
@@ -160,13 +159,11 @@ init_admin:
 	fi; \
 	VPC_ID=$$VPC_ID \
 	make --no-print-directory -s create-sd-namespace; \
-	SD_SERVICE_ARN=($$(make --no-print-directory -s register-sd-service)); \
 	VPC_ID=$$VPC_ID \
 	SUBNET1_ID=$$SUBNET1_ID \
 	SUBNET2_ID=$$SUBNET2_ID \
 	SG_LAMBDA=$$SG_LAMBDA \
 	SG_ECS=$$SG_ECS \
-	SD_SERVICE_ARN=$$SD_SERVICE_ARN \
 	make --no-print-directory -s push_aws_parameters; \
 	$(MAKE) create-ecs-cluster
 	. ./scripts/assume-role.sh \
@@ -307,7 +304,6 @@ push_aws_parameters:
 	echo "SUBNET2_ID=$$SUBNET2_ID"         >> $$TMP_ENV; \
 	echo "SG_LAMBDA=$$SG_LAMBDA"           >> $$TMP_ENV; \
 	echo "SG_ECS=$$SG_ECS"         		   >> $$TMP_ENV; \
-	echo "SD_SERVICE_ARN=$$SD_SERVICE_ARN" >> $$TMP_ENV; \
 	env AWS_ACCESS_KEY_ID=$$AWS_ACCESS_KEY_ID \
 	    AWS_SECRET_ACCESS_KEY=$$AWS_SECRET_ACCESS_KEY \
 	    AWS_SESSION_TOKEN=$$AWS_SESSION_TOKEN \
