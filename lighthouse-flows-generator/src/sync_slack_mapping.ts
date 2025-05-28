@@ -53,7 +53,7 @@ async function fetchAllSlackUsers() {
     }
     cursor = res.response_metadata?.next_cursor;
   } while (cursor);
-  console.log('Fetched Slack users:', JSON.stringify(users, null, 2));
+  // console.log('Fetched Slack users:', JSON.stringify(users, null, 2));
   return users;
 }
 
