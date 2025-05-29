@@ -486,3 +486,21 @@ start-session:
 		--target ecs:$(ECS_CLUSTER)_$${TASK_ID}_$${RUNTIME_ID} \
 		--document-name  AWS-StartPortForwardingSessionToRemoteHost \
 		--parameters '{"host":["127.0.0.1"],"portNumber":["$(APP_PORT)"],"localPortNumber":["8080"]}'
+
+ecs-exec:
+	. ./scripts/assume-role.sh \
+		--role-name $(CONNECT_ECS) \
+		--profile admin; \
+	TASK_ARN=$$(aws ecs list-tasks \
+		--cluster $(ECS_CLUSTER) \
+		--service-name $(ECS_SERVICE)-$(STUDENT_ID) \
+		--desired-status RUNNING \
+		--query 'taskArns[0]' \
+		--output text); \
+	TASK_ID=$${TASK_ARN##*/}; \
+	aws ecs execute-command \
+		--cluster lighthouse-cluster \
+		--task arn:aws:ecs:ap-northeast-1:$(AWS_ACCOUNT_ID):task/$(ECS_CLUSTER)/$$TASK_ID \
+		--container web-server \
+		--interactive \
+		--command "/bin/sh"
