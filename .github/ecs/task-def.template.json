@@ -31,5 +31,6 @@
     "requiresCompatibilities": ["FARGATE"],
     "cpu": "256",
     "memory": "512",
-    "executionRoleArn": "arn:aws:iam::${AWS_ACCOUNT_ID}:role/${DEPLOY_TASK_ROLE_NAME}"
+    "executionRoleArn": "arn:aws:iam::${AWS_ACCOUNT_ID}:role/${WORK_SPACE_EXECUTION_ROLE_NAME}",
+    "taskRoleArn": "arn:aws:iam::${AWS_ACCOUNT_ID}:role/${WORK_SPACE_TASK_ROLE_NAME}"
 }

@@ -122,6 +122,9 @@ init_aws:
 
 init_admin:
 	brew install gh
+	brew install --cask session-manager-plugin
+	./scripts/sync_github_secrets.sh -r ${LIGHTHOUSE_ORG}/${LIGHTHOUSE_REPOSITORY_NAME} -f ./.env.github.secrets.lighthouse
+	./scripts/sync_github_secrets.sh -r ${WORK_SPACE_ORG}/${WORK_SPACE_REPOSITORY_NAME} -f ./.env.github.secrets.work_space
 	if ! RESPONSE=$$(make --no-print-directory -s create-oidc-provider 2>&1); then \
 	  if echo "$$RESPONSE" | grep -q 'EntityAlreadyExists'; then \
 	    echo "OIDCプロバイダーは既に存在しています。処理を継続します。"; \
@@ -140,15 +143,18 @@ init_admin:
 	SG_LAMBDA=$${VARS[0]}; \
 	SG_ECS=$${VARS[1]}; \
 	SG_ECR=$${VARS[2]}; \
+	SG_SSM=$${VARS[3]}; \
 	SG_LAMBDA=$$SG_LAMBDA \
 	SG_ECS=$$SG_ECS \
 	SG_ECR_ID=$$SG_ECR \
+	SG_SSM=$$SG_SSM \
 	make --no-print-directory -s create-security-rule; \
 	if ! RESPONSE=$$( \
 		VPC_ID=$$VPC_ID \
 		SUBNET1_ID=$$SUBNET1_ID \
 		SUBNET2_ID=$$SUBNET2_ID \
 		SG_ECR_ID=$$SG_ECR \
+		SG_SSM_ID=$$SG_SSM \
 		make --no-print-directory -s create-endpoint 2>&1); then \
 		if echo "$$RESPONSE" | grep -q 'AlreadyExists'; then \
 	    	echo "エンドポイントは既に存在しています。処理を継続します。"; \
@@ -265,7 +271,13 @@ create-security-group:
 		--vpc-id $$VPC_ID \
 		--query 'GroupId' \
 		--output text); \
-	echo "$$SG_LAMBDA $$SG_ECS $$SG_ECR_ID"
+	SG_SSM_ID=$$(aws ec2 create-security-group \
+		--group-name $(SG_SSM_NAME) \
+		--description "SSM Interface Endpoint SG" \
+		--vpc-id $$VPC_ID \
+		--query GroupId \
+		--output text); \
+	echo "$$SG_LAMBDA $$SG_ECS $$SG_ECR_ID $$SG_SSM_ID"
 
 create-security-rule:
 	. ./scripts/assume-role.sh \
@@ -280,7 +292,12 @@ create-security-rule:
 		--group-id $$SG_ECR_ID \
 		--protocol tcp \
 		--port 443 \
-		--source-group $$SG_ECS
+		--source-group $$SG_ECS; \
+	aws ec2 authorize-security-group-ingress \
+		--group-id $$SG_SSM \
+		--protocol tcp \
+		--port 443 \
+		--source-group $$SG_ECS; \
 
 register-task-definition:
 	set -o allexport && source ./.env.participant && source ./.env && envsubst < .github/ecs/task-def.template.json > ./.github/ecs/task-def.json
@@ -349,6 +366,7 @@ create-ecs-service:
 		--desired-count 1 \
 		--launch-type FARGATE \
 		--service-registries registryArn=$$SD_SERVICE_ARN \
+		--enable-execute-command \
 		--deployment-configuration "minimumHealthyPercent=0,maximumPercent=100" \
 		--network-configuration "awsvpcConfiguration={ \
 			subnets=[$$SUBNET1_ID,$$SUBNET2_ID], \
@@ -393,7 +411,16 @@ create-endpoint:
 		--service-name com.amazonaws.${MY_AWS_REGION}.logs \
 		--subnet-ids $$SUBNET1_ID $$SUBNET2_ID \
 		--security-group-ids $$SG_ECR_ID \
-		--private-dns-enabled
+		--private-dns-enabled; \
+	for svc in ssm ssmmessages ec2messages ; do \
+		aws ec2 create-vpc-endpoint \
+			--vpc-id $$VPC_ID \
+			--service-name com.amazonaws.$(MY_AWS_REGION).$$svc \
+			--vpc-endpoint-type Interface \
+			--subnet-ids $$SUBNET1_ID $$SUBNET2_ID \
+			--security-group-ids $$SG_SSM_ID \
+			--private-dns-enabled; \
+	done
 
 create-logs-group:
 	echo "✅$(LOGS_GROUP_ROLE_NAME)"
@@ -439,11 +466,41 @@ register-sd-service:
 		--dns-config "NamespaceId=$$NAMESPACE_ID,RoutingPolicy=MULTIVALUE,DnsRecords=[{Type=A,TTL=60}]" \
 		--query "Service.Arn" --output text \
 
-test:
+start-session:
 	. ./scripts/assume-role.sh \
-	--role-name $(MAPPING_ROLE_NAME) \
-	--profile admin; \
-	AWS_ACCESS_KEY_ID=$$AWS_ACCESS_KEY_ID \
-	AWS_SECRET_ACCESS_KEY=$$AWS_SECRET_ACCESS_KEY \
-	AWS_SESSION_TOKEN=$$AWS_SESSION_TOKEN \
-	npx ts-node ./lighthouse-flows-generator/src/sync_slack_mapping.ts
+		--role-name $(CONNECT_ECS) \
+		--profile admin; \
+	TASK_ARN=$$(aws ecs list-tasks \
+		--cluster $(ECS_CLUSTER) \
+		--service-name $(ECS_SERVICE)-$(STUDENT_ID) \
+		--desired-status RUNNING \
+		--query 'taskArns[0]' \
+		--output text); \
+	TASK_ID=$${TASK_ARN##*/}; \
+	RUNTIME_ID=$$(aws ecs describe-tasks \
+		--cluster ${ECS_CLUSTER} \
+		--tasks "$$TASK_ID" \
+		--query 'tasks[0].containers[?name==`web-server`].runtimeId' \
+		--output text); \
+	aws ssm start-session \
+		--target ecs:$(ECS_CLUSTER)_$${TASK_ID}_$${RUNTIME_ID} \
+		--document-name  AWS-StartPortForwardingSessionToRemoteHost \
+		--parameters '{"host":["127.0.0.1"],"portNumber":["$(APP_PORT)"],"localPortNumber":["8080"]}'
+
+ecs-exec:
+	. ./scripts/assume-role.sh \
+		--role-name $(CONNECT_ECS) \
+		--profile admin; \
+	TASK_ARN=$$(aws ecs list-tasks \
+		--cluster $(ECS_CLUSTER) \
+		--service-name $(ECS_SERVICE)-$(STUDENT_ID) \
+		--desired-status RUNNING \
+		--query 'taskArns[0]' \
+		--output text); \
+	TASK_ID=$${TASK_ARN##*/}; \
+	aws ecs execute-command \
+		--cluster lighthouse-cluster \
+		--task arn:aws:ecs:ap-northeast-1:$(AWS_ACCOUNT_ID):task/$(ECS_CLUSTER)/$$TASK_ID \
+		--container web-server \
+		--interactive \
+		--command "/bin/sh"
