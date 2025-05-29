@@ -18,7 +18,8 @@ env:
   ENVIRONMENT_COMMAND: ${{ toJson(github.event.client_payload.ENVIRONMENT_COMMAND) }}
   MY_AWS_REGION: ${{ secrets.AWS_REGION }}
   AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
-  DEPLOY_TASK_ROLE_NAME: ${{ secrets.DEPLOY_TASK_ROLE_NAME }}
+  WORK_SPACE_EXECUTION_ROLE_NAME: ${{ secrets.WORK_SPACE_EXECUTION_ROLE_NAME }}
+  WORK_SPACE_TASK_ROLE_NAME: ${{ secrets.WORK_SPACE_TASK_ROLE_NAME }}
   ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}-${{ github.event.client_payload.STUDENT_ID }}
   CONTAINER_NAME: ${{ secrets.CONTAINER_NAME }}
   ECS_CLUSTER: ${{ secrets.ECS_CLUSTER }}
