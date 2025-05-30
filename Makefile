@@ -455,7 +455,7 @@ create-sd-namespace:
 register-sd-service:
 	. ./scripts/assume-role.sh \
 		--role-name $(CLOUDMAP_ROLE_NAME) \
-		--profile admin; \
+		--profile participant; \
 	NAMESPACE_ID=$$(aws servicediscovery list-namespaces \
 	    --filters "Name=TYPE,Values=DNS_PRIVATE" "Name=NAME,Values=$(SD_NAMESPACE)" \
 	    --query "Namespaces[0].Id" --output text); \
