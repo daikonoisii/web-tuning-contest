@@ -337,6 +337,7 @@ get_aws_parameters:
 		--path "/${PARAMETERS_PREFIX}" \
 		--with-decryption \
 		--recursive \
+		--region "$(MY_AWS_REGION)" \
 		--output json); \
 	output="{"; \
 	first=true; \
@@ -377,6 +378,7 @@ create-ecs-service:
 		}"; \
 	aws lambda update-function-configuration \
 		--function-name $(LIGHTHOUSE_FUNCTION_NAME) \
+		--region $(MY_AWS_REGION) \
 		--vpc-config "SubnetIds=$$SUBNET1_ID,$$SUBNET2_ID,SecurityGroupIds=$$SG_LAMBDA"
 
 create-endpoint:
@@ -460,9 +462,11 @@ register-sd-service:
 		--profile participant; \
 	NAMESPACE_ID=$$(aws servicediscovery list-namespaces \
 	    --filters "Name=TYPE,Values=DNS_PRIVATE" "Name=NAME,Values=$(SD_NAMESPACE)" \
+		--region "$(MY_AWS_REGION)" \
 	    --query "Namespaces[0].Id" --output text); \
 	aws servicediscovery create-service \
 		--name "$(ECS_SERVICE)-$(STUDENT_ID)" \
+		--region "$(MY_AWS_REGION)" \
 		--namespace-id $$NAMESPACE_ID \
 		--description "Service Discovery for $(ECS_SERVICE)-$(STUDENT_ID)" \
 		--dns-config "NamespaceId=$$NAMESPACE_ID,RoutingPolicy=MULTIVALUE,DnsRecords=[{Type=A,TTL=60}]" \
