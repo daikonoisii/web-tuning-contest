@@ -4,6 +4,7 @@ ifneq ($(filter create-ecr-repository \
 				create-ecs-service \
 				init_mac \
 				create-logs-group \
+				get_aws_parameters \
 				register-task-definition,$(MAKECMDGOALS)),)
   # create-ecr-repositoryならparticipant 用を読み込む
   -include .env.participant
