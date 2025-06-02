@@ -290,6 +290,11 @@ create-security-rule:
 		--protocol tcp \
 		--port $(APP_PORT) \
 		--source-group $$SG_LAMBDA; \
+	aws ec2 authorize-security-group-egress \
+		--group-id $$SG_LAMBDA \
+		--protocol tcp \
+		--port $(APP_PORT) \
+		--cidr 0.0.0.0/0; \
 	aws ec2 authorize-security-group-ingress \
 		--group-id $$SG_ECR_ID \
 		--protocol tcp \
