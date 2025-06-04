@@ -139,6 +139,7 @@ init_admin:
 	VPC_ID=$${VARS[0]}; \
 	SUBNET1_ID=$${VARS[1]}; \
 	SUBNET2_ID=$${VARS[2]}; \
+	PUB_SUBNET1_ID=$${VARS[3]}; \
 	VARS=($$( \
 		VPC_ID=$${VPC_ID} \
 		make --no-print-directory -s create-security-group)); \
@@ -165,6 +166,11 @@ init_admin:
 	    	exit 1; \
 		fi; \
 	fi; \
+	PUB_SUBNET1_ID=$$PUB_SUBNET1_ID \
+	SUBNET1_ID=$$SUBNET1_ID \
+	SUBNET2_ID=$$SUBNET2_ID \
+	VPC_ID=$$VPC_ID \
+	make --no-print-directory -s create-nat-gateway; \
 	VPC_ID=$$VPC_ID \
 	make --no-print-directory -s create-sd-namespace; \
 	VPC_ID=$$VPC_ID \
@@ -249,7 +255,82 @@ create-vpc:
 				--availability-zone $(AZ1) --query 'Subnet.SubnetId' --output text); \
 	SUBNET2_ID=$$(aws ec2 create-subnet --vpc-id $$VPC_ID --cidr-block $(SUBNET2_CIDR) \
 				--availability-zone $(AZ2) --query 'Subnet.SubnetId' --output text); \
-	echo "$$VPC_ID $$SUBNET1_ID $$SUBNET2_ID"
+	PUB_SUBNET1_ID=$$(aws ec2 create-subnet \
+		--vpc-id $$VPC_ID \
+		--cidr-block $(PUBLIC_SUBNET1_CIDR) \
+		--availability-zone $(AZ1) \
+		--tag-specifications "ResourceType=subnet,Tags=[{Key=Name,Value=$(PUBLIC_SUBNET_NAME)-az1}]" \
+		--query 'Subnet.SubnetId' \
+		--output text); \
+	IGW_ID=$$(aws ec2 create-internet-gateway \
+		--query 'InternetGateway.InternetGatewayId' \
+		--output text); \
+	aws ec2 attach-internet-gateway \
+		--vpc-id $$VPC_ID \
+		--internet-gateway-id $$IGW_ID \
+		> /dev/null; \
+	PUB_RTB_ID=$$(aws ec2 create-route-table \
+		--vpc-id $$VPC_ID \
+		--query 'RouteTable.RouteTableId' \
+		--output text); \
+	aws ec2 create-route \
+		--route-table-id $$PUB_RTB_ID \
+		--destination-cidr-block 0.0.0.0/0 \
+		--gateway-id $$IGW_ID \
+		> /dev/null; \
+	aws ec2 associate-route-table \
+		--subnet-id $$PUB_SUBNET1_ID \
+		--route-table-id $$PUB_RTB_ID \
+		> /dev/null; \
+	echo "$$VPC_ID $$SUBNET1_ID $$SUBNET2_ID $$PUB_SUBNET1_ID"
+
+create-nat-gateway:
+	. ./scripts/assume-role.sh \
+		--role-name $(GATEWAY_ROLE_NAME) \
+		--profile admin; \
+	echo "→ Allocating Elastic IP for AZ1..."; \
+	EIP1=$$(aws ec2 allocate-address \
+		--domain vpc \
+		--query 'AllocationId' \
+		--output text); \
+	echo "→ Created EIP1: $$EIP1"; \
+	echo "→ Creating NAT Gateway in PUBLIC_SUBNET1 (AZ1 = $(AZ1))..."; \
+	NAT_GW1=$$(aws ec2 create-nat-gateway \
+		--subnet-id $$PUB_SUBNET1_ID \
+		--region $(MY_AWS_REGION) \
+		--allocation-id $$EIP1 \
+		--query 'NatGateway.NatGatewayId' \
+		--output text); \
+	echo "→ NAT Gateway1 ID: $$NAT_GW1"; \
+	until aws ec2 describe-nat-gateways \
+		--nat-gateway-ids $$NAT_GW1 \
+		--region $(MY_AWS_REGION) \
+	  	--query 'NatGateways[0].State' \
+		--output text | grep -q available; do \
+	  		echo "⏳ Waiting for NAT Gateway1 ($$NAT_GW1) to become AVAILABLE..." && sleep 5; \
+	done; \
+	echo "✅ NAT Gateway1 ($$NAT_GW1) is AVAILABLE"; \
+	echo "→ Associating private subnets with NAT Gateways..."; \
+	echo "→ Creating private Route Table..."; \
+	PRIVATE_RTB=$$(aws ec2 create-route-table \
+		--vpc-id $$VPC_ID \
+		--query 'RouteTable.RouteTableId' \
+		--output text); \
+	echo "→ Private Route Table ID: $$PRIVATE_RTB"; \
+	echo "→ Associating Private Subnet1 ($$SUBNET1_ID) with $$PRIVATE_RTB"; \
+	aws ec2 associate-route-table \
+		--subnet-id $$SUBNET1_ID \
+		--route-table-id $$PRIVATE_RTB; \
+	echo "→ Associating Private Subnet2 ($$SUBNET2_ID) with $$PRIVATE_RTB"; \
+	aws ec2 associate-route-table \
+		--subnet-id $$SUBNET2_ID \
+		--route-table-id $$PRIVATE_RTB; \
+	echo "→ Adding 0.0.0.0/0 → NAT_GW1 on $$PRIVATE_RTB"; \
+	aws ec2 create-route \
+		--route-table-id $$PRIVATE_RTB \
+		--destination-cidr-block 0.0.0.0/0 \
+		--nat-gateway-id $$NAT_GW1; \
+	echo "✅ Private subnets are now routed through $$PRIVATE_RTB."; \
 
 create-security-group:
 	. ./scripts/assume-role.sh \
@@ -294,6 +375,16 @@ create-security-rule:
 		--group-id $$SG_LAMBDA \
 		--protocol tcp \
 		--port $(APP_PORT) \
+		--cidr 0.0.0.0/0; \
+	aws ec2 authorize-security-group-egress \
+		--group-id $$SG_LAMBDA \
+		--protocol udp \
+		--port 53 \
+		--cidr 0.0.0.0/0; \
+	aws ec2 authorize-security-group-egress \
+		--group-id $$SG_LAMBDA \
+		--protocol tcp \
+		--port 443 \
 		--cidr 0.0.0.0/0; \
 	aws ec2 authorize-security-group-ingress \
 		--group-id $$SG_ECR_ID \
