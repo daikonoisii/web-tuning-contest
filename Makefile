@@ -79,6 +79,7 @@ invoke_lighthouse_lambda:
 init_mac:
 	bash -c "\
 	  brew install gettext && \
+	  brew install awscli && \
 	  brew install jq && \
 	  brew link --force gettext && \
 	  which envsubst && envsubst --version && \
