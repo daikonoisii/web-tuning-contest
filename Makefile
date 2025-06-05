@@ -79,7 +79,6 @@ invoke_lighthouse_lambda:
 init_mac:
 	bash -c "\
 	  brew install gettext && \
-	  brew install awscli && \
 	  brew install jq && \
 	  brew link --force gettext && \
 	  which envsubst && envsubst --version && \
@@ -121,6 +120,7 @@ init_mac:
 	@echo "✅ finish"
 
 init_aws:
+	brew install awscli
 	./scripts/aws_login.sh $(ENV)
 
 init_admin:
