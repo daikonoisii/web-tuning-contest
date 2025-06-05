@@ -3,3 +3,4 @@ assume-role-config.json
 lighthouse-flows-generator/output.json
 work_space/*
 .github/ecs/task-def.json
+lighthouse-*.html
