@@ -79,7 +79,6 @@ invoke_lighthouse_lambda:
 init_mac:
 	bash -c "\
 	  brew install gettext && \
-	  brew install awscli && \
 	  brew install jq && \
 	  brew link --force gettext && \
 	  which envsubst && envsubst --version && \
@@ -121,13 +120,17 @@ init_mac:
 	@echo "✅ finish"
 
 init_aws:
+	brew install awscli
 	./scripts/aws_login.sh $(ENV)
 
-init_admin:
+init_github_actions:
 	brew install gh
-	brew install --cask session-manager-plugin
 	./scripts/sync_github_secrets.sh -r ${LIGHTHOUSE_ORG}/${LIGHTHOUSE_REPOSITORY_NAME} -f ./.env.github.secrets.lighthouse
 	./scripts/sync_github_secrets.sh -r ${WORK_SPACE_ORG}/${WORK_SPACE_REPOSITORY_NAME} -f ./.env.github.secrets.work_space
+
+init_admin:
+	brew install --cask session-manager-plugin
+	make --no-print-directory -s init_github_actions;
 	if ! RESPONSE=$$(make --no-print-directory -s create-oidc-provider 2>&1); then \
 	  if echo "$$RESPONSE" | grep -q 'EntityAlreadyExists'; then \
 	    echo "OIDCプロバイダーは既に存在しています。処理を継続します。"; \
