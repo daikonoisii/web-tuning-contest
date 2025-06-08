@@ -100,6 +100,14 @@ jobs:
           cluster: ${{ env.ECS_CLUSTER }}
           service: ${{ env.ECS_SERVICE }}
           task-definition: ${{ steps.render-task-def.outputs.task-definition }}
+          wait-for-service-stability: true
+
+      # 完了待ち
+      - name: Wait for ECS service to be stable
+        run: |
+          aws ecs wait services-stable \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services ${{ env.ECS_SERVICE }}
 
       # 計測対象のURLを作成
       - name: Build payload.json
